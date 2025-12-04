@@ -63,9 +63,26 @@ class AggregateConfig:
     paths: AggregatePaths = field(default_factory=AggregatePaths)
 
 @dataclass
+class DownloadPaths:
+    """Directory paths used by the script."""
+    # Output directory for historic downloads
+    historic: str = "cache"
+    # Output directory of live downloads
+    live: str = "data/temp"
+
+@dataclass
+class DownloadConfig:
+    """The root configuration for the download.py script."""
+    max_retries: int = 3
+    backoff_factor: int = 2
+    timeout: int = 10
+    paths: DownloadPaths = field(default_factory=DownloadPaths)
+
+@dataclass
 class AppConfig:
     """The root configuration for the entire application."""
     aggregate: AggregateConfig = field(default_factory=AggregateConfig)
+    download: DownloadConfig = field(default_factory=DownloadConfig)
     resample: ResampleConfig = field(default_factory=ResampleConfig)
 
 #--- Load functionality ---

@@ -149,7 +149,7 @@ def main():
 
         # Prepare download tasks for JSON files that are missing
         download_tasks = [
-            (sym, dt)
+            (sym, dt, config)
             for dt in dates
             for sym in symbols
             if not Path(f"{CACHE_PATH}/{dt:%Y}/{dt:%m}/{sym}_{dt:%Y%m%d}.json").is_file()

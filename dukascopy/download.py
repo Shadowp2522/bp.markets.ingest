@@ -30,14 +30,9 @@ import orjson
 import numpy as np
 from datetime import date, datetime, timezone
 from pathlib import Path
+from config.app_config import AppConfig, DownloadConfig, load_app_config
 
 ENABLE_BACKFILL_FILTER = True  # We do not support backfilling atm. Forward only pipeline.
-
-CACHE_PATH = "cache"           # Directory where historical data files are stored
-TEMP_PATH = "data/temp"        # Directory for storing today's live data
-
-MAX_RETRIES = 3                # Number of retry attempts for failed downloads
-BACKOFF_FACTOR = 2             # Exponential backoff multiplier for retry delays
 
 session = None                 # Session per worker
 
@@ -109,7 +104,7 @@ def download_filter_backfilled_items(temp_path: Path, cache_path: Path) -> bool:
         # Log error for debugging
         raise e
 
-def download_symbol(symbol: str, dt: date) -> bool:
+def download_symbol(symbol: str, dt: date, app_config: AppConfig) -> bool:
     """
     Download Dukascopy minute-level delta JSON data for a given symbol and date.
 
@@ -139,11 +134,13 @@ def download_symbol(symbol: str, dt: date) -> bool:
     if session is None:
         session = requests.Session()   # Create session ONCE per worker
 
+    config = app_config.download
+
     today_dt = datetime.now(timezone.utc).date()
 
     # Build output file paths for historical vs. live data
-    historical_archive_path = Path(CACHE_PATH) / dt.strftime(f"%Y/%m/{symbol}_%Y%m%d.json")
-    live_staging_path = Path(TEMP_PATH) / dt.strftime(f"{symbol}_%Y%m%d.json")
+    historical_archive_path = Path(config.paths.historic) / dt.strftime(f"%Y/%m/{symbol}_%Y%m%d.json")
+    live_staging_path = Path(config.paths.live) / dt.strftime(f"{symbol}_%Y%m%d.json")
 
     is_historical = not dt == today_dt
 
@@ -157,7 +154,7 @@ def download_symbol(symbol: str, dt: date) -> bool:
         final_target_path = historical_archive_path
 
     # Attempt the download with retry logic
-    for attempt in range(MAX_RETRIES):
+    for attempt in range(config.max_retries):
         try:
             # Perform HTTP GET request
             response = session.get(url, 
@@ -165,16 +162,16 @@ def download_symbol(symbol: str, dt: date) -> bool:
                     "Accept-Encoding": "gzip, deflate",
                     "User-Agent": "dukascopy-downloader/1.0 (+https://github.com/jpueberbach4/bp.markets.ingest/blob/main/dukascopy/download.py)"
                 },
-                timeout=10
+                timeout=config.timeout
             )
             response.raise_for_status()
             break
         except requests.exceptions.RequestException as e:
-            if attempt < MAX_RETRIES - 1:
+            if attempt < config.max_retries - 1:
                 # Check whether the error is temporary (rate limit or server error)
                 status_code = getattr(e.response, 'status_code', 0)
                 if status_code >= 500 or status_code == 429: # 429: Too Many Requests
-                    wait_time = BACKOFF_FACTOR ** attempt
+                    wait_time = config.backoff_factor ** attempt
                     print(f"Transient error {status_code}. Retrying in {wait_time}s...")
                     time.sleep(wait_time)
                     continue
@@ -222,10 +219,10 @@ def fork_download(args: tuple) -> bool:
     Parameters
     ----------
     args : tuple
-        Tuple containing (symbol, dt) to pass to download_symbol.
+        Tuple containing (symbol, dt, config) to pass to download_symbol.
     """
-    symbol, dt = args
+    symbol, dt, app_config = args
     
-    download_symbol(symbol, dt)
+    download_symbol(symbol, dt, app_config)
 
     return True
