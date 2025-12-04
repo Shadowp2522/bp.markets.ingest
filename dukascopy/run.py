@@ -157,7 +157,7 @@ def main():
 
         # Prepare transform tasks for CSV files that are missing
         transform_tasks = [
-            (sym, dt)
+            (sym, dt, config)
             for dt in dates
             for sym in symbols
             if not Path(f"{DATA_PATH}/{dt:%Y}/{dt:%m}/{sym}_{dt:%Y%m%d}.csv").is_file()

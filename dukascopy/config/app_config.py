@@ -79,11 +79,28 @@ class DownloadConfig:
     paths: DownloadPaths = field(default_factory=DownloadPaths)
 
 @dataclass
+class TransformPaths:
+    """Directory paths used by the script."""
+    # Input directory for historic
+    historic: str = "cache"
+    # Output directory for transform of historic
+    data: str = "data/transform/1m"
+    # Input/Output directory of live
+    live: str = "data/temp"
+
+@dataclass
+class TransformConfig:
+    """The root configuration for the download.py script."""
+    round_decimals: int = 10
+    paths: TransformPaths = field(default_factory=TransformPaths)
+
+@dataclass
 class AppConfig:
     """The root configuration for the entire application."""
     aggregate: AggregateConfig = field(default_factory=AggregateConfig)
     download: DownloadConfig = field(default_factory=DownloadConfig)
     resample: ResampleConfig = field(default_factory=ResampleConfig)
+    transform: TransformConfig = field(default_factory=TransformConfig)
 
 #--- Load functionality ---
 T = TypeVar('T')

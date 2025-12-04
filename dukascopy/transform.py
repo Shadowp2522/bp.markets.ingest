@@ -28,13 +28,9 @@ import orjson
 import os
 from datetime import date
 from pathlib import Path
+from config.app_config import AppConfig, TransformConfig, load_app_config
 
-CACHE_PATH = "cache"              # Dukascopy cached Delta downloads are here
-DATA_PATH = "data/transform/1m"   # Output path for the transformed files
-TEMP_PATH = "data/temp"           # Today's live data is stored here
-ROUND_DECIMALS = 8                # Round prices to this number of decimals
-
-def transform_symbol(symbol: str, dt: date) -> bool:
+def transform_symbol(symbol: str, dt: date, app_config: AppConfig) -> bool:
     """
     Transform a single symbol's JSON market data into a normalized OHLC CSV.
 
@@ -49,16 +45,20 @@ def transform_symbol(symbol: str, dt: date) -> bool:
         Trading symbol to transform.
     dt : date
         Date of the data to process.
+    app_config : AppConfig
+        Configuration object.
 
     Returns
     -------
     bool
         True if transformation succeeded, False otherwise.
     """
-    cache_path = Path(CACHE_PATH) / dt.strftime(f"%Y/%m/{symbol}_%Y%m%d.json")
-    data_path = Path(DATA_PATH) / dt.strftime(f"%Y/%m/{symbol}_%Y%m%d.csv")
-    temp_cache_path = Path(TEMP_PATH) / dt.strftime(f"{symbol}_%Y%m%d.json")
-    temp_data_path = Path(TEMP_PATH) / dt.strftime(f"{symbol}_%Y%m%d.csv")
+    config = app_config.transform
+
+    cache_path = Path(config.paths.historic) / dt.strftime(f"%Y/%m/{symbol}_%Y%m%d.json")
+    data_path = Path(config.paths.data) / dt.strftime(f"%Y/%m/{symbol}_%Y%m%d.csv")
+    temp_cache_path = Path(config.paths.live) / dt.strftime(f"{symbol}_%Y%m%d.json")
+    temp_data_path = Path(config.paths.live) / dt.strftime(f"{symbol}_%Y%m%d.csv")
 
     is_historical = cache_path.is_file()
 
@@ -102,10 +102,10 @@ def transform_symbol(symbol: str, dt: date) -> bool:
     # Create dataframe and round OHLC prices
     df = pd.DataFrame({
         'time': [str(t).replace('T', ' ')[:19] for t in np.array(times*1_000_000, dtype='datetime64[ns]')], # (Extreme) Performance optimization
-        'open': np.round(opens, ROUND_DECIMALS),
-        'high': np.round(highs, ROUND_DECIMALS),
-        'low': np.round(lows, ROUND_DECIMALS),
-        'close': np.round(closes, ROUND_DECIMALS),
+        'open': np.round(opens, config.round_decimals),
+        'high': np.round(highs, config.round_decimals),
+        'low': np.round(lows, config.round_decimals),
+        'close': np.round(closes, config.round_decimals),
         'volume': volumes
     })
 
@@ -133,10 +133,10 @@ def fork_transform(args) -> bool:
     Parameters
     ----------
     args : tuple
-        Tuple containing (symbol, dt) to pass to transform_symbol.
+        Tuple containing (symbol, dt, config) to pass to transform_symbol.
     """
-    symbol, dt = args
+    symbol, dt, config  = args
 
-    transform_symbol(symbol, dt)
+    transform_symbol(symbol, dt, config)
     
     return True
