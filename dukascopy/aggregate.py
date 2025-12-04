@@ -41,14 +41,7 @@ import os
 from datetime import date, datetime
 from pathlib import Path
 from typing import Tuple
-
-START_DATE = "2025-11-01"               # Start date for historic data loading
-NUM_PROCESSES = os.cpu_count()          # Number of simultaneous loaders
-
-INDEX_PATH = "data/aggregate/1m/index"  # Use offset-pointers from this location
-DATA_PATH = "data/transform/1m"         # Data of aggregate.py is stored here
-TEMP_PATH = "data/temp"                 # Data of today
-AGGREGATE_PATH = "data/aggregate/1m"    # Output path for the aggregated files
+from config.app_config import AppConfig, AggregateConfig, load_app_config
 
 def aggregate_read_index(index_path: Path) -> Tuple[date, int, int]:
     """
@@ -136,7 +129,7 @@ def aggregate_write_index(index_path: Path, dt: date, input_position: int, outpu
     os.replace(index_temp_path, index_path)
     return True
 
-def aggregate_symbol(symbol: str, dt: date) -> bool:
+def aggregate_symbol(symbol: str, dt: date, app_config: AppConfig) -> bool:
     """
     Incrementally load and aggregate CSV data for a single trading symbol and date.
 
@@ -175,14 +168,17 @@ def aggregate_symbol(symbol: str, dt: date) -> bool:
     - The function uses `aggregate_write_index` for atomic index updates.
     - Any partial writes or crashes can be safely recovered by rerunning this function.
     """
+    config = app_config.aggregate
+
+
     # Construct paths
-    index_path = Path(AGGREGATE_PATH) / f"index/{symbol}.idx"
-    output_path = Path(AGGREGATE_PATH) / f"{symbol}.csv"
-    input_path = Path(DATA_PATH) / f"{dt.year}/{dt.month:02}/{symbol}_{dt:%Y%m%d}.csv"
+    index_path = Path(config.paths.data) / f"index/{symbol}.idx"
+    output_path = Path(config.paths.data) / f"{symbol}.csv"
+    input_path = Path(config.paths.historic) / f"{dt.year}/{dt.month:02}/{symbol}_{dt:%Y%m%d}.csv"
 
     if not input_path.exists():
         # Assume we should look in data/temp
-        input_path =  Path(TEMP_PATH) / f"{symbol}_{dt:%Y%m%d}.csv"
+        input_path =  Path(config.paths.live) / f"{symbol}_{dt:%Y%m%d}.csv"
         if not input_path.exists():
             return False
     
@@ -270,9 +266,15 @@ def fork_aggregate(args) -> bool:
         True if all dates were processed successfully,
         False if interrupted by the user.
     """
-    symbol, dates = args
+    symbol, dates, config = args
 
     for dt in dates:
-        aggregate_symbol(symbol, dt)
+        aggregate_symbol(symbol, dt, config)
     
     return True
+
+
+if __name__ == "__main__":
+    config = load_app_config()
+
+    print(config.aggregate)

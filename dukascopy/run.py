@@ -164,7 +164,7 @@ def main():
         ]
 
         # Prepare aggregate tasks (one per symbol, covering all dates)
-        aggregate_tasks = [(sym, dates) for sym in symbols]
+        aggregate_tasks = [(sym, dates, config) for sym in symbols]
 
         # Prepare resample tasks (one per symbol)
         resample_tasks = [(symbol, config) for symbol in symbols]

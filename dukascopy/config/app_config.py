@@ -47,10 +47,25 @@ class ResampleConfig:
     # Mapping: symbol name -> symbol-specific overrides.
     symbols: Dict[str, ResampleSymbolOverride] = field(default_factory=dict)
 
+@dataclass
+class AggregatePaths:
+    """Directory paths used by the script."""
+    # Output directory for aggregate results.
+    data: str = "data/aggregate/1m"
+    # Input directory of transform results (historic)
+    historic: str = "data/transform/1m"
+    # Input directory of transform results (live)
+    live: str = "data/temp"
+
+@dataclass
+class AggregateConfig:
+    """The root configuration for the aggregate.py script."""
+    paths: AggregatePaths = field(default_factory=AggregatePaths)
 
 @dataclass
 class AppConfig:
     """The root configuration for the entire application."""
+    aggregate: AggregateConfig = field(default_factory=AggregateConfig)
     resample: ResampleConfig = field(default_factory=ResampleConfig)
 
 #--- Load functionality ---
