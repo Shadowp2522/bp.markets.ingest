@@ -18,7 +18,7 @@ git reset --hard origin/main
 ./rebuild-weekly.sh
 ```
 
-## [0.3.0-stable] - 2025-12-10
+## [0.3.0-stable] - 2025-12-04
 
 ### Changed
 - **Configuration**: Everything is now configurable through YAML
