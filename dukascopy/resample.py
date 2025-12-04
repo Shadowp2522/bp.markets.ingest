@@ -63,7 +63,7 @@ import os
 import pandas as pd
 import yaml
 from dataclasses import asdict
-from config.app_config import AppConfig, ResampleConfig, load_app_config
+from config.app_config import AppConfig, ResampleConfig, ResampleSymbolOverride, load_app_config
 from pathlib import Path
 from tqdm import tqdm
 from io import StringIO
@@ -102,7 +102,7 @@ def resample_get_symbol_config(symbol: str, app_config: AppConfig) -> ResampleCo
     merged_config: ResampleConfig = copy.deepcopy(global_config)
 
     # Check for symbol-specific overrides
-    symbol_override: SymbolOverride = global_config.symbols.get(symbol)
+    symbol_override: ResampleSymbolOverride = global_config.symbols.get(symbol)
 
     if symbol_override:
         # Override global round_decimals if specified
