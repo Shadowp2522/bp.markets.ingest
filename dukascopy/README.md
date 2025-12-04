@@ -11,9 +11,10 @@
   - Directory Permissions
   - First Run & Incremental Mode
   - Automatic Updates (cron)
-- [Pipeline Configuration](#pipeline-configuration-v03-and-above)
 - [Symbols Configuration](#symbols-configuration)
   - Adding New Symbols
+- [Pipeline Configuration](#pipeline-configuration-v03-and-above)
+  - Overriding timeframes, etc
 - [Quick Check](#quick-check)
 - [Performance Benchmarks](#performance-benchmarks)
   - Cold Run (Full History)
