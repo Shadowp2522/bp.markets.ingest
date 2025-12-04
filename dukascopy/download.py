@@ -118,6 +118,8 @@ def download_symbol(symbol: str, dt: date, app_config: AppConfig) -> bool:
         Trading symbol to download.
     dt : date
         Date of the data to download.
+    app_config : AppConfig
+        Config object.
 
     Returns
     -------

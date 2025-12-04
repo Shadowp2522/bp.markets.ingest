@@ -46,7 +46,7 @@ def transform_symbol(symbol: str, dt: date, app_config: AppConfig) -> bool:
     dt : date
         Date of the data to process.
     app_config : AppConfig
-        Configuration object.
+        Config object
 
     Returns
     -------

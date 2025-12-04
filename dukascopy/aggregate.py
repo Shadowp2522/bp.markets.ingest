@@ -147,6 +147,8 @@ def aggregate_symbol(symbol: str, dt: date, app_config: AppConfig) -> bool:
         Trading symbol to process (e.g., "EURUSD").
     dt : date
         The specific date of the source CSV to aggregate.
+    app_config : AppConfig
+        Config object.
 
     Returns
     -------
@@ -259,6 +261,8 @@ def fork_aggregate(args) -> bool:
             The symbol to aggregate.
         - dates : list[datetime.date]
             The list of trading dates to process sequentially.
+        - app_config : AppConfig
+            Config object
 
     Returns
     -------

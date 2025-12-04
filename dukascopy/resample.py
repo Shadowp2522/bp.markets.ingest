@@ -226,7 +226,7 @@ def resample_batch_read(f_input: IO, header: str, config: ResampleConfig) -> Tup
     header : str
         The CSV header line to be written first in the output, without the `offset` column.
     config: ResampleConfig
-        Config object for reading round_decimals
+        Config object
 
     Returns
     -------
@@ -269,7 +269,7 @@ def resample_batch(sio: StringIO, rule: str, label: str, closed: str, config: Re
     closed : str
         Which side of the resample window is closed ('left' or 'right').
     config: ResampleConfig
-        Config object for reading round_decimals
+        Config object
 
     Returns
     -------
@@ -468,7 +468,7 @@ def fork_resample(args) -> bool:
     Parameters
     ----------
     args : tuple
-        Tuple containing (symbol, list of dates).
+        Tuple containing (symbol, list of dates, config).
     """
     symbol, config = args
     

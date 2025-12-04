@@ -523,11 +523,7 @@ START_DATE=2005-01-01 ./run.sh
 
 >Cascaded indicator engine
 
->YAML-based configuration
-
 >Central backfill detection and redistribution service? Using Github? 
-
->DuckDB analytical layer
 
 >MSSIB Extension for DuckDB
 
