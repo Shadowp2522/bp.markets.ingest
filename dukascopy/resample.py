@@ -327,7 +327,7 @@ def resample_batch(sio: StringIO, rule: str, label: str, closed: str, config: Re
     # Return the resampled dataframe
     return resampled, next_input_position
 
-def resample_symbol(symbol: str, config: ResampleConfig) -> bool:
+def resample_symbol(symbol: str, app_config: AppConfig) -> bool:
     """
     Incrementally resample OHLCV data for a single trading symbol across all configured timeframes.
 
@@ -359,7 +359,7 @@ def resample_symbol(symbol: str, config: ResampleConfig) -> bool:
     bool
         Always returns True for now. This may be extended in the future for status reporting.
     """
-    config = resample_get_symbol_config(symbol, config)
+    config = resample_get_symbol_config(symbol, app_config)
 
     # Main output path
     data_path = config.paths.data
