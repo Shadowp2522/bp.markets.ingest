@@ -17,3 +17,9 @@ git reset --hard origin/main
 # Rebuild data to apply calendar alignment fixes
 ./rebuild-weekly.sh
 ```
+
+## [0.3.0-stable] - 2025-12-10
+
+### Changed
+- **Configuration**: Everything is now configurable through YAML
+- **Documentation**: Updated README with instructions
