@@ -533,7 +533,7 @@ START_DATE=2005-01-01 ./run.sh
 
 ---
 
-## DuckDB (Experimental/Advanced users)
+## DuckDB (Advanced users)
 
 ```sh
 pip install duckdb
