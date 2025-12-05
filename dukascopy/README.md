@@ -15,6 +15,8 @@
   - Adding New Symbols
 - [Pipeline Configuration](#pipeline-configuration-v03-and-above)
   - Overriding timeframes, etc
+- [Output schema](#output-schema)
+  - Details on generated files
 - [Quick Check](#quick-check)
 - [Performance Benchmarks](#performance-benchmarks)
   - Cold Run (Full History)
@@ -351,6 +353,25 @@ resample:
 ```
 
 **Note**: if you change resample, make sure you put the timeframes in the right order, because the stages depend on each other. On each resample configuration change, perform a ```./rebuild-weekly.sh```.
+
+---
+
+## Output schema
+
+All intermediate and final outputs use the same standardized OHLCV CSV format.
+
+```sh
+time, open, high, low, close, volume
+2025-11-26 00:00:00,1.15648,1.16021,1.1547,1.16017,108027.31
+2025-11-27 00:00:00,1.16018,1.16132,1.15763,1.15996,51613.66
+2025-11-28 00:00:00,1.15995,1.16075,1.1555,1.15973,177674.44
+2025-11-30 00:00:00,1.1594,1.16078,1.15912,1.1601,3303.65
+2025-12-01 00:00:00,1.16011,1.16522,1.15893,1.16066,93031.96
+2025-12-02 00:00:00,1.16069,1.1629,1.1591,1.1628,74084.42
+2025-12-03 00:00:00,1.1628,1.16775,1.16277,1.16661,95673.2
+2025-12-04 00:00:00,1.16662,1.16819,1.16409,1.16431,79510.51
+2025-12-05 00:00:00,1.16433,1.16717,1.16415,1.16467,37127.59
+```
 
 ---
 
