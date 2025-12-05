@@ -397,7 +397,12 @@ The open candle will always be the last row in the CSV. If you prefer not to inc
 
 
 **Total pipeline time:** **~3.9 minutes**  
-**Throughput:** **> 1 million candles processed per second (78 million per minute)**
+
+**Throughput (stage average):** **> 1 million candles processed per second**
+
+**Throughput (pipeline average):** **> 500 thousand candles processed per second**
+
+>Excellent for commodity hardware.
 
 ### Incremental Run (Daily Update)
 > **Workload:** 26 symbols × 1 day of new data
