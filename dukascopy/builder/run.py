@@ -347,6 +347,7 @@ def parse_args():
         'select_data': sorted(set(final_selections)),
         'partition': args.partition,
         'output_dir': args.output_dir,
+        'dry_run': args.dry_run,
         'force': args.force,
         'keep_temp': args.keep_temp,
         'after': args.after,

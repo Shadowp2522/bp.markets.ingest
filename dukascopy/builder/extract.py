@@ -67,6 +67,11 @@ def extract_symbol(task: Tuple[str, str, str, str, str, Dict[str, Any]]) -> bool
         bool: True on successful execution. Raises Exception on failure.
     """
     symbol, timeframe, input_filepath, after_str, until_str, options = task
+
+    if options['dry_run']:
+        print(f"DRY-RUN: {symbol}/{timeframe} => {input_filepath}")
+        return False
+
     
     root_output_dir = options.get('output_dir', './temp/parquet')
 
