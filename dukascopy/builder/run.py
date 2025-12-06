@@ -347,9 +347,8 @@ def parse_args():
         )
         parser.error(msg)
     
-
     return {
-        'select_data': sorted(set(final_selections)),   # sorted unique selections
+        'select_data': sorted(set(final_selections), key=lambda x: (x[0], x[1], x[2], x[3] if x[3] is not None else "")),   # sorted unique selections
         'partition': args.partition,
         'output_dir': args.output_dir,
         'dry_run': args.dry_run,
