@@ -461,6 +461,16 @@ Example usage
 
 >Use build-parquet.sh to convert raw CSV data into a format that’s ready for high-performance analysis. Use a quoted ```--select "*/*"``` if you need to export all symbols, all timeframes, within a date-range.
 
+```sh
+python3 -c "
+  import duckdb
+  df = duckdb.sql(\"\"\"
+    SELECT * FROM 'my_cool_parquet_file.parquet' WHERE timeframe='1m' and symbol='EUR-USD' order by time  asc LIMIT 40;
+  \"\"\").df()
+print(df)
+"
+```
+
 ---
 
 ## Performance Benchmarks
