@@ -65,12 +65,14 @@ Note:
 """
 
 import argparse
+import duckdb
 import extract
 import os
 import re
 import sys
 import time
 import uuid
+import shutil
 from datetime import datetime
 from multiprocessing import get_context
 from pathlib import Path
@@ -145,6 +147,63 @@ def get_available_data_from_fs() -> List[Tuple[str, str, str]]:
                 )
             
     return sorted(set(available_data))
+
+
+# Assuming temporary files are stored in a consistent location, 
+# for example, a temporary directory defined early in the script.
+TEMP_DIR = Path("./temp_parquet_exports") # Define this globally or in main
+
+def merge_parquet_files(input_dir: Path, output_file: str, compression: str, cleanup: bool) -> int:
+    """
+    Reads all temporary Parquet files from input_dir and merges them 
+    into a single final Parquet file using DuckDB.
+
+    Args:
+        input_dir: Path to the directory containing temporary Parquet files.
+        output_file: The final destination filename (e.g., 'my_cool_file.parquet').
+        compression: The compression codec to use for the final file.
+
+    Returns:
+        int: The number of files successfully merged.
+    """
+    input_files = list(input_dir.glob("**/*.parquet"))
+    if not input_files:
+        print(f"Warning: No temporary Parquet files found in {input_dir}. Nothing to merge.")
+        return 0
+
+    # DuckDB's read_parquet function accepts a list of file paths.
+    # We use the glob pattern to make it concise.
+    input_pattern = str(input_dir / "**" / "*.parquet")
+    
+    con = duckdb.connect(database=':memory:')
+    
+    try:
+        # The query reads all matching Parquet files and executes a COPY TO statement.
+        merge_query = f"""
+            COPY (
+                SELECT * FROM read_parquet('{input_pattern}', union_by_name=true)
+            )
+            TO '{output_file}' 
+            (
+                FORMAT PARQUET,
+                COMPRESSION '{compression.upper()}'
+            );
+        """
+        con.execute(merge_query)
+        
+        return len(input_files)
+
+    except Exception as e:
+        print(f"Critical error during consolidation: {e}")
+        raise
+        
+    finally:
+        if cleanup:
+            for filename in input_files:
+                Path(filename).unlink()
+            shutil.rmtree(input_dir)
+
+        con.close()
 
 
 def parse_args():
@@ -349,6 +408,9 @@ def main():
         
         # TODO: implement merging / partition assembly
         if not options['partition']:
+            print(f"Merging {options['output_dir']} to {options['output']}...")
+            merge_parquet_files(Path(options['output_dir']), options['output'], options['compression'], not options['keep_temp'])
+
             pass
 
         elapsed = time.time() - start_time

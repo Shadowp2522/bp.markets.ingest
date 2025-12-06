@@ -12,3 +12,4 @@ symbols.user.txt
 crypto.user.txt
 dukascopy.db
 tests/*
+*.parquet
