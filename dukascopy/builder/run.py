@@ -70,6 +70,7 @@ import os
 import re
 import sys
 import time
+import uuid
 from datetime import datetime
 from multiprocessing import get_context
 from pathlib import Path
@@ -310,6 +311,10 @@ def main():
 
         options = parse_args()
         print(f"Running Dukascopy PARQUET exporter ({NUM_PROCESSES} processes)")
+
+        # Not partition handling? we need to set a temp output directory
+        if not options['partition']:
+            options['output_dir'] = f"temp/parquet/{uuid.uuid4()}"
 
         # Build list of extraction tasks for workers
         extract_tasks = [

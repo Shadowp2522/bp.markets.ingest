@@ -1,12 +1,44 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""
+===============================================================================
+File:        extract.py
+Author:      JP Ueberbach
+Created:     2025-12-06
+Description: Extract to parquet
 
-# extract.py
+This module provides functionality to extract, filter, transform, and export
+financial time series data from Dukascopy CSV files into partitioned Parquet 
+datasets using DuckDB. 
+
+It supports:
+- Reading CSV files with a predefined Dukascopy schema.
+- Filtering data by a date range.
+- Optional exclusion of the most recent open candle.
+- Exporting data into Parquet format partitioned by symbol and year.
+- Customizable compression format for Parquet output.
+- Integration with multiprocessing workflows.
+
+Functions:
+- extract_symbol(task: Tuple[str, str, str, str, str, Dict[str, Any]]) -> bool
+    Processes a single CSV file and writes the resulting data to Parquet.
+- fork_extract(task: Tuple[str, str, str, str, str, Dict[str, Any]]) -> bool
+    Wrapper for multiprocessing pool execution of `extract_symbol`.
+
+Dependencies:
+- duckdb
+- pathlib
+- datetime
+- uuid
+- typing
+- os
+"""
 
 import duckdb
 import os
 import uuid
+from pathlib import Path
 from datetime import datetime
 from typing import Tuple, Dict, Any
 
@@ -34,8 +66,11 @@ def extract_symbol(task: Tuple[str, str, str, str, str, Dict[str, Any]]) -> bool
     """
     symbol, timeframe, input_filepath, after_str, until_str, options = task
     
-    root_output_dir = options.get('output_dir', './temp/parquet') 
-    
+    root_output_dir = options.get('output_dir', './temp/parquet')
+
+    if not Path(root_output_dir).exists():
+        Path(root_output_dir).parent.mkdir(parents=True, exist_ok=True)
+        
     select_columns = f"""
         '{symbol}'::VARCHAR AS symbol,
         '{timeframe}'::VARCHAR AS timeframe,
