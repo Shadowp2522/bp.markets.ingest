@@ -313,7 +313,7 @@ def main():
 
         # Build list of extraction tasks for workers
         extract_tasks = [
-            (sym, tf, filename, options['after'], options['until'])
+            (sym, tf, filename, options['after'], options['until'], options)
             for sym, tf, filename in options['select_data']
         ]
 
