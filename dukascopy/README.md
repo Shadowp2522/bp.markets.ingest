@@ -438,8 +438,10 @@ Example usage
 ```
 
 ```sh
-usage: build-parquet.sh [-h] --select SYMBOL/TF1,TF2,... [--after AFTER] [--until UNTIL] (--output FILE_PATH | --output_dir DIR_PATH) [--compression {snappy,gzip,brotli,zstd,lz4,none}] [--omit-open-candles]
-              [--force] [--dry-run] [--partition] [--keep-temp]
+usage: build-parquet.sh [-h] --select SYMBOL/TF1,TF2,... [--after AFTER] 
+                        [--until UNTIL] (--output FILE_PATH | --output_dir DIR_PATH) 
+                        [--compression {snappy,gzip,brotli,zstd,lz4,none}] [--omit-open-candles]
+                        [--force] [--dry-run] [--partition] [--keep-temp]
 
 Batch extraction utility for symbol/timeframe datasets.
 
