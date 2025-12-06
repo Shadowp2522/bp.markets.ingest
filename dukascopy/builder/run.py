@@ -97,7 +97,7 @@ class CustomArgumentParser(argparse.ArgumentParser):
     the command with --help.
     """
     def error(self, message):
-        sys.stderr.write(f'Error: {message}\n\n')
+        sys.stderr.write(f'{message}\n\n')
         self.print_help(sys.stderr)
         sys.exit(2)
 
@@ -171,7 +171,6 @@ def merge_parquet_files(input_dir: Path, output_file: str, compression: str, cle
         return 0
 
     # DuckDB's read_parquet function accepts a list of file paths.
-    # We use the glob pattern to make it concise.
     input_pattern = str(input_dir / "**" / "*.parquet")
     
     con = duckdb.connect(database=':memory:')
@@ -210,24 +209,12 @@ def merge_parquet_files(input_dir: Path, output_file: str, compression: str, cle
 def parse_args():
     """
     Parse and validate all command-line arguments.
-
-    Responsibilities:
-    - Register all CLI options
-    - Validate selection expressions and date formats
-    - Enforce mutually exclusive output modes
-    - Ensure partitioning rules are obeyed
-    - Resolve symbol/timeframe wildcards against actual data
-    - Produce a fully validated configuration dictionary
-
-    Returns:
-        dict: Validated options and resolved (symbol, timeframe, path) selections.
     """
     parser = CustomArgumentParser(
         description="Batch extraction utility for symbol/timeframe datasets.",
         formatter_class=argparse.RawTextHelpFormatter
     )
 
-    # --select may be provided multiple times
     parser.add_argument(
         '--select',
         action='append',
@@ -236,7 +223,6 @@ def parse_args():
         help="Defines how symbols and timeframes are selected. Wildcards (*) are supported.\nThe skiplast modifier can be applied to exclude the last row of a timeframe."
     )
 
-    # Makes the conditionals easier in fork_extract
     DEFAULT_AFTER = "1970-01-01 00:00:00"
     DEFAULT_UNTIL = "3000-01-01 00:00:00"
 
@@ -245,7 +231,6 @@ def parse_args():
     parser.add_argument('--until', type=str, default=DEFAULT_UNTIL,
                     help=f"End date/time (exclusive). Format: YYYY-MM-DD HH:MM:SS (Default: {DEFAULT_UNTIL})")
 
-    # Exactly one output mode must be chosen
     output_group = parser.add_mutually_exclusive_group(required=True)
     output_group.add_argument('--output', type=str, metavar='FILE_PATH',
                               help="Write a single merged Parquet file.")
@@ -269,98 +254,96 @@ def parse_args():
 
     args = parser.parse_args()
     
-    # ---- Date validation -------------------------------------------------
     date_format = "%Y-%m-%d %H:%M:%S"
     try:
+        # Parse the string timestamps into real datetime objects
         dt_after = datetime.strptime(args.after, date_format) if args.after else None
         dt_until = datetime.strptime(args.until, date_format) if args.until else None
     except ValueError:
         parser.error(f"Invalid date format. Expected: {date_format}")
 
+    # Enforce valid chronological ordering
     if dt_after and dt_until and dt_after >= dt_until:
         parser.error("--after must be strictly earlier than --until")
 
+    # Enforce required pairing between --partition and --output_dir
     if args.partition and not args.output_dir:
         parser.error("--partition requires --output_dir")
     if not args.partition and not args.output:
         parser.error("Without --partition, --output must be provided")
 
-    # ---- Discover datasets ----------------------------------------------
+    # Scan filesystem and collect all known (symbol, timeframe, path) triples
     all_available_data = get_available_data_from_fs()
+
+    # Distinct symbols, timeframes, and (symbol,timeframe) pairs extracted from FS
     available_symbols = sorted({d[0] for d in all_available_data})
     available_timeframes = sorted({d[1] for d in all_available_data})
-    # NOTE: available_pairs is now resolved using the BASE timeframe (no modifier)
     available_pairs = {(d[0], d[1]) for d in all_available_data}
 
     if not available_symbols:
         parser.error("No datasets found in data/. Run the main pipeline first.")
 
-    # Modified structure: (Symbol, Timeframe_Spec, Path, Modifier)
     final_selections: List[Tuple[str, str, str, str | None]] = []
-    all_requested_pairs_base = set() # Stores (Symbol, BASE_Timeframe) for resolution/validation
+    all_requested_pairs_base = set()
 
-    # ---- Resolve each --select expression -------------------------------
     for selection_str in args.select:
         if '/' not in selection_str:
-            parser.error(f"Invalid format: {selection_str} (expected SYMBOL/TF)")
+            parser.error(f"Invalid format: {selection_str} (expected SYMBOL/TF[:modifier])")
             
         symbol_pattern, timeframes_str = selection_str.split('/', 1)
-        # Timeframes is now a list of strings like ['1h', '4h', '1W:skiplast']
+
+        # Example: "1h:skiplast" → ["1h:skiplast", "4h", ...]
         timeframes_specs = [tf.strip() for tf in timeframes_str.split(',')]
         
-        # Extract BASE timeframes for resolution
         base_timeframes = []
         for tf_spec in timeframes_specs:
+            # Extract bare timeframe (before any :modifier)
             base_tf = tf_spec.split(':')[0]
             base_timeframes.append(base_tf)
 
-        # '*' timeframe expands to all available base resolutions
+        # Expand "*" timeframe to all available timeframes
         if '*' in base_timeframes:
-            # Recreate the specs based on available timeframes, assuming no modifier
-            timeframes_specs = available_timeframes
-            base_timeframes = available_timeframes
+            timeframes_specs = available_timeframes[:]  # expand to full set
+            base_timeframes = available_timeframes[:]   # same as above
 
-        # Convert "ABC-*/1m" → regex: r"ABC-.*"
+        # Convert wildcard pattern to regex for symbol matching
         regex_pattern = symbol_pattern.replace('.', r'\.').replace('*', r'.*')
 
-        # Match selected symbols
+        # Match symbols based on wildcard-expanded regex
         matches = [s for s in available_symbols if re.fullmatch(regex_pattern, s)]
         if not matches:
-            # Maintain record of orphan selections (base timeframe)
+            # Track selections that matched no symbol, useful for error reporting
             all_requested_pairs_base.add((symbol_pattern, timeframes_str))
 
-        # Resolve (symbol, timeframe) → actual file path
         for symbol in matches:
             for tf_spec in timeframes_specs:
-                # Extract BASE timeframe and modifier for matching
-                base_tf = tf_spec.split(':')[0]
-                modifier = tf_spec.split(':')[1] if ':' in tf_spec else None
-                
+                base_tf = tf_spec.split(':')[0]       # base timeframe
+                modifier = tf_spec.split(':')[1] if ':' in tf_spec else None  # optional modifier
+
                 requested_base = (symbol, base_tf)
                 all_requested_pairs_base.add(requested_base)
-                
-                # Check if the BASE timeframe actually exists on disk
+
+                # Find the actual file path for this (symbol, base_tf)
                 if requested_base in available_pairs:
+                    # Iterate original FS metadata to get exact path for the pair
                     for tup in all_available_data:
-                        # tup is (symbol, base_tf, path)
                         if tup[0] == symbol and tup[1] == base_tf:
-                            # Append the resolved data, using the full spec and the modifier
-                            # final_selections is now (Symbol, Timeframe_Spec, Path, Modifier)
+                            # Append (symbol, full tf_spec, file path, modifier)
                             final_selections.append((symbol, tf_spec, tup[2], modifier))
                             break
 
-    # ---- Validate unresolved selections ----------------------------------
-    # NOTE: Validation must now check against all_requested_pairs_base
-    resolved_pairs = {(d[0], d[1].split(':')[0]) for d in final_selections} # Use BASE TF
+    # Extract only base timeframe (strip modifiers) for resolution checking
+    resolved_pairs = {(d[0], d[1].split(':')[0]) for d in final_selections}
+
+    # Determine which requested pairs could not be matched to actual data
     unresolved_pairs = sorted(all_requested_pairs_base - resolved_pairs)
 
     if unresolved_pairs and not args.force:
-        # Reconstruct the original request for the error message
         error_msg_pairs = []
         for sym, tf_spec in unresolved_pairs:
-             # Try to find the original spec or just use the base if not found
-             original_spec = next((s for s in timeframes_specs if s.startswith(tf_spec)), tf_spec)
-             error_msg_pairs.append(f"- {sym}/{original_spec}\n")
+            # Attempt to find how the user originally wrote the timeframe (with modifiers)
+            original_spec = next((s for s in timeframes_specs if s.startswith(tf_spec)), tf_spec)
+            error_msg_pairs.append(f"- {sym}/{original_spec}\n")
         
         msg = (
             "\nCritical Error: The following selections match no existing files:\n"
@@ -368,10 +351,8 @@ def parse_args():
         )
         parser.error(msg)
     
-    # Sort and return the final selections
-
     return {
-        'select_data': sorted(set(final_selections)),
+        'select_data': sorted(set(final_selections)),   # sorted unique selections
         'partition': args.partition,
         'output_dir': args.output_dir,
         'dry_run': args.dry_run,
@@ -382,6 +363,7 @@ def parse_args():
         'output': args.output,
         'compression': args.compression
     }
+
 
 
 def main():
