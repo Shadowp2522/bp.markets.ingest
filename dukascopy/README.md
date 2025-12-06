@@ -456,7 +456,7 @@ optional arguments:
                         Write a partitioned Parquet dataset.
   --compression {snappy,gzip,brotli,zstd,lz4,none}
                         Compression codec for Parquet output.
-  --omit-open-candles   Drop the newest candle if incomplete.
+  --omit-open-candles   Drop the newest candle if incomplete. (Needs fixing)
   --force               Allow patterns that match no files (Testing)
   --dry-run             Parse/resolve arguments only; do not run extraction. (Missing)
   --partition           Enable Hive-style partitioned output (requires --output_dir).
