@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Batch extraction utility for symbol/timeframe datasets.
+===============================================================================
+File:        run.py
+Author:      JP Ueberbach
+Created:     2025-12-06
+Description: Batch extraction utility for symbol/timeframe datasets.
 
 This module provides a command-line interface for selecting, filtering, and
 extracting data files based on symbol and timeframe patterns. All intermediate
@@ -70,21 +74,292 @@ run as a standalone script.
 Store timeframe as a regular column inside the Parquet files. Let's see what works best.
 """
 
+import argparse
+import sys
+from datetime import datetime
+from pathlib import Path
+import re
+from typing import List, Tuple, Dict, Any
+
+class CustomArgumentParser(argparse.ArgumentParser):
+    """
+    ArgumentParser subclass that prints the full help message whenever a parsing
+    error occurs.
+
+    This improves user experience by:
+      - Showing the specific error message first
+      - Displaying the complete help/usage output automatically
+      - Exiting with status code 2 (standard argparse error code)
+
+    The behavior is useful for CLI tools where incorrect arguments should
+    provide immediate, fully detailed guidance without requiring users to
+    rerun the command with --help.
+    """
+    def error(self, message):
+        sys.stderr.write(f'Error: {message}\n\n')
+        self.print_help(sys.stderr)
+        sys.exit(2) 
+
+def get_available_data_from_fs() -> List[Tuple[str, str, str]]:
+    """
+    Discover all available CSV datasets in the filesystem.
+
+    The function scans the following directory structure:
+      data/
+        aggregate/1m/
+        resample/<timeframe>/
+
+    It identifies all CSV files under these directories and returns a list of
+    tuples in the form:
+        (symbol, timeframe, absolute_file_path)
+
+    Returns:
+        A sorted list of unique (symbol, timeframe, file_path) tuples.
+    """
+    data_dir = Path("data")
+    if not data_dir.is_dir():
+        return []
+    
+    available_data: List[Tuple[str, str, str]] = []
+    
+    # Base scan list: only 1m aggregate data is guaranteed to exist.
+    scan_dirs = {
+        "1m": data_dir / "aggregate" / "1m",
+    }
+    
+    # Dynamically add all directories under data/resample/* as timeframes.
+    resample_base = data_dir / "resample"
+    if resample_base.is_dir():
+        for tf_path in resample_base.iterdir():
+            if tf_path.is_dir():
+                # Directory name (e.g., "5m", "1h") is the timeframe.
+                scan_dirs[tf_path.name] = tf_path
+
+    # Iterate through all known directories and collect CSV files.
+    for timeframe, dir_path in scan_dirs.items():
+        if dir_path.is_dir():
+            for file_path in dir_path.glob("*.csv"):
+                symbol = file_path.stem                    # Symbol name from filename
+                file_path_str = str(file_path.resolve())   # Absolute path for portability
+                available_data.append((symbol, timeframe, file_path_str))
+            
+    # Deduplicate results and sort for stable output.
+    unique_data = sorted(list(set(available_data)))
+    return unique_data
+
+def parse_args():
+    """
+    Parse and validate all command-line arguments for the batch extraction utility.
+
+    This function:
+    - Defines all supported CLI arguments (selection rules, date filters,
+      output options, compression settings, safety flags, etc.)
+    - Enforces mutually exclusive output modes (--output vs --output_dir)
+    - Validates date formats and chronological consistency
+    - Ensures partitioning rules are respected
+    - Returns a fully validated argparse.Namespace object
+    """
+
+    parser = CustomArgumentParser(
+        description="Batch extraction utility for symbol/timeframe datasets.",
+        formatter_class=argparse.RawTextHelpFormatter
+    )
+
+    parser.add_argument(
+        '--select',
+        action='append',
+        required=True,
+        metavar='SYMBOL/TF1,TF2,...',
+        help=(
+            "Specify symbol and timeframe selections.\n"
+            "Example: --select EUR-USD/1m,5m --select BTC-*/4h"
+        )
+    )
+
+    parser.add_argument(
+        '--after',
+        type=str,
+        help="Start date/time (inclusive). Format: 'YYYY-MM-DD HH:MM:SS'."
+    )
+    parser.add_argument(
+        '--until',
+        type=str,
+        help="End date/time (exclusive). Format: 'YYYY-MM-DD HH:MM:SS'."
+    )
+
+    output_group = parser.add_mutually_exclusive_group(required=True)
+    
+    output_group.add_argument(
+        '--output',
+        type=str,
+        metavar='FILE_PATH',
+        help="Write a single aggregated Parquet file (no partitioning)."
+    )
+    
+    output_group.add_argument(
+        '--output_dir',
+        type=str,
+        metavar='DIR_PATH',
+        help="Write a partitioned Parquet dataset (requires --partition)."
+    )
+    
+    parser.add_argument(
+        '--compression',
+        type=str,
+        default='zstd',
+        choices=['snappy', 'gzip', 'brotli', 'zstd', 'lz4', 'none'],
+        help="Compression codec for output Parquet files."
+    )
+    
+    parser.add_argument(
+        '--omit-open-candles',
+        action='store_true',
+        help="Exclude the latest (possibly incomplete) candle from each timeframe."
+    )
+    
+    parser.add_argument(
+        '--force',
+        action='store_true',
+        help="Do not abort if a selection pattern matches no input files."
+    )
+    
+    parser.add_argument(
+        '--dry-run',
+        action='store_true',
+        help="Perform argument parsing and task discovery only; do not execute work."
+    )
+
+    parser.add_argument(
+        '--partition',
+        action='store_true',
+        help="Enable Hive-style partitioning (requires --output_dir)."
+    )
+    
+    parser.add_argument(
+        '--keep-temp',
+        action='store_true',
+        help="Retain intermediate files instead of cleaning them up."
+    )
+
+    args = parser.parse_args()
+    
+    date_format = "%Y-%m-%d %H:%M:%S"
+    
+    dt_after = None
+    dt_until = None
+    
+    for arg_name in ['after', 'until']:
+        date_str = getattr(args, arg_name)
+        if date_str:
+            try:
+                dt_obj = datetime.strptime(date_str, date_format)
+                if arg_name == 'after':
+                    dt_after = dt_obj
+                else:
+                    dt_until = dt_obj
+            except ValueError:
+                parser.error(f"Argument --{arg_name}: Invalid date format. Must be '{date_format}'")
+
+    if dt_after and dt_until:
+        if dt_after >= dt_until:
+            parser.error(
+                f"Date range invalid: --after ({args.after}) must be strictly "
+                f"before --until ({args.until})."
+            )
+            
+    if args.partition and not args.output_dir:
+        parser.error("--partition requires the --output_dir argument.")
+    
+    if not args.partition and not args.output:
+        parser.error("Without --partition, the --output argument is required.")
+
+    all_available_data = get_available_data_from_fs()
+
+    all_available_timeframes = sorted(list(set([d[1] for d in all_available_data])))
+    if not all_available_timeframes:
+        parser.error("No timeframes found in data directories. Pipeline hasn't created any data yet.")
+    
+    available_pairs = set([(d[0], d[1]) for d in all_available_data])
+    
+    available_symbols = sorted(list(set([d[0] for d in all_available_data])))
+    if not available_symbols:
+        parser.error("No data found in 'data/' directories. Please run the main pipeline first.")
+    
+    final_selections: List[Tuple[str, str, str]] = []
+    
+    all_requested_pairs = set()
+
+    for selection_str in args.select:
+        if '/' not in selection_str:
+            parser.error(f"Invalid --select format: '{selection_str}'. Must be SYMBOL/TF1,TF2,...")
+            
+        symbol_pattern, timeframes_str = selection_str.split('/', 1)
+        timeframes = [tf.strip() for tf in timeframes_str.split(',')]
+
+        if '*' in timeframes:
+            timeframes = all_available_timeframes
+
+        regex_pattern = symbol_pattern.replace('.', r'\.').replace('*', r'.*')
+        
+        matches = [s for s in available_symbols if re.fullmatch(regex_pattern, s)]
+        
+        for symbol in matches:
+            for tf in timeframes:
+                requested_pair = (symbol, tf)
+                all_requested_pairs.add(requested_pair)
+                
+                if requested_pair in available_pairs:
+                    for data_tuple in all_available_data:
+                        if data_tuple[0] == symbol and data_tuple[1] == tf:
+                            final_selections.append(data_tuple)
+                            break
+
+    resolved_pairs = set([(d[0], d[1]) for d in final_selections])
+    unresolved_pairs = sorted(list(all_requested_pairs - resolved_pairs))
+
+    if unresolved_pairs:
+        # TODO: --force
+        error_msg = "\nCritical Error: The following requested Symbol/Timeframe pairs could not be resolved to existing data files:\n"
+        for symbol, tf in unresolved_pairs:
+            error_msg += f"- {symbol}/{tf} (File not found on disk)\n"
+        parser.error(error_msg)
+
+    final_selections = sorted(list(set(final_selections)))
+        
+    return {
+        'select_data': final_selections, 
+        'after': args.after,
+        'until': args.until,
+        'output': args.output,
+        'compression': args.compression,
+        'omit_open_candles': args.omit_open_candles,
+    }
+
+
+
 def main():
-    # preliminary:
-    # read arguments
-    # validate arguments, eg. date-range, select-expressions, compression
-    # discover all symbols, tf's for --select=SYMBOL_EXPR/TF1_EXPR,TF2_EXPR - based on file-existence
-    # selects without matches will abort extraction, unless --force specified
-    # construct task list for workers, fork_extract(symbol, tf, after, until, to_filename, options )
-    # initialize multiprocessing pool
-    # execute tasks in pool with tqdm (progress tracking)
-    # wait for pool to complete, raised errors by workers are critical and cause abort
-    # todo: see on partition strategy
-    # merge all pool output files to single parquet (skip if --partition set)
-    # cleanup intermediate files
-    # present user with status report
-    pass
+    try:
+        # Read and validate arguments, discover all file (symbol,tf) matches based on --select (TODO: --force)
+        result = parse_args()
+        # construct task list for workers, fork_extract(symbol, tf, after, until, to_filename, options )
+        # initialize multiprocessing pool
+        # execute tasks in pool with tqdm (progress tracking)
+        # wait for pool to complete, raised errors by workers are critical and cause abort
+        # todo: see on partition strategy
+        # merge all pool output files to single parquet (skip if --partition set)
+        # cleanup intermediate files
+        # present user with status report
+        print(result)
+
+        
+    except SystemExit as e:
+        # Catch SystemExit which is raised on error, print status for user
+        if e.code == 0:
+            pass
+        elif e.code == 2:
+            print("\nExiting due to command-line syntax error.")
+        else:
+            raise
 
 if __name__ == "__main__":
     main()
