@@ -223,9 +223,9 @@ def parse_args():
     DEFAULT_UNTIL = "3000-01-01 00:00:00"
 
     parser.add_argument('--after', type=str, default=DEFAULT_AFTER,
-                    help=f"Start date/time (inclusive). Format: YYYY-MM-DD HH:MM:SS (Default: {DEFAULT_AFTER})")
+                        help=f"Start date/time (inclusive). Format: YYYY-MM-DD HH:MM:SS (Default: {DEFAULT_AFTER})")
     parser.add_argument('--until', type=str, default=DEFAULT_UNTIL,
-                    help=f"End date/time (exclusive). Format: YYYY-MM-DD HH:MM:SS (Default: {DEFAULT_UNTIL})")
+                        help=f"End date/time (exclusive). Format: YYYY-MM-DD HH:MM:SS (Default: {DEFAULT_UNTIL})")
 
     output_group = parser.add_mutually_exclusive_group(required=True)
     output_group.add_argument('--output', type=str, metavar='FILE_PATH',
@@ -252,26 +252,26 @@ def parse_args():
     
     date_format = "%Y-%m-%d %H:%M:%S"
     try:
-        # Parse the string timestamps into real datetime objects
+        # Convert string timestamps to real datetime objects for validation
         dt_after = datetime.strptime(args.after, date_format) if args.after else None
         dt_until = datetime.strptime(args.until, date_format) if args.until else None
     except ValueError:
         parser.error(f"Invalid date format. Expected: {date_format}")
 
-    # Enforce valid chronological ordering
+    # Ensure user-defined time window is chronologically valid
     if dt_after and dt_until and dt_after >= dt_until:
         parser.error("--after must be strictly earlier than --until")
 
-    # Enforce required pairing between --partition and --output_dir
+    # These flags must be paired correctly depending on output mode
     if args.partition and not args.output_dir:
         parser.error("--partition requires --output_dir")
     if not args.partition and not args.output:
         parser.error("Without --partition, --output must be provided")
 
-    # Scan filesystem and collect all known (symbol, timeframe, path) triples
+    # Load (symbol, timeframe, file_path) entries from the filesystem
     all_available_data = get_available_data_from_fs()
 
-    # Distinct symbols, timeframes, and (symbol,timeframe) pairs extracted from FS
+    # Build sets for fast lookup & matching during pattern expansion
     available_symbols = sorted({d[0] for d in all_available_data})
     available_timeframes = sorted({d[1] for d in all_available_data})
     available_pairs = {(d[0], d[1]) for d in all_available_data}
@@ -279,7 +279,10 @@ def parse_args():
     if not available_symbols:
         parser.error("No datasets found in data/. Run the main pipeline first.")
 
-    final_selections: List[Tuple[str, str, str, str | None]] = []
+    # Stores final deduplicated selection, with modifier-priority resolution
+    priority_map: Dict[Tuple[str, str], Tuple[str, str, str, str | None]] = {} 
+
+    # Used to detect unresolved selections for error reporting
     all_requested_pairs_base = set()
 
     for selection_str in args.select:
@@ -288,58 +291,66 @@ def parse_args():
             
         symbol_pattern, timeframes_str = selection_str.split('/', 1)
 
-        # Example: "1h:skiplast" → ["1h:skiplast", "4h", ...]
+        # User may supply multiple TF definitions in a single --select
         timeframes_specs = [tf.strip() for tf in timeframes_str.split(',')]
         
+        # Extract base timeframe (e.g. "H1" from "H1:skiplast")
         base_timeframes = []
         for tf_spec in timeframes_specs:
-            # Extract bare timeframe (before any :modifier)
             base_tf = tf_spec.split(':')[0]
             base_timeframes.append(base_tf)
 
-        # Expand "*" timeframe to all available timeframes
+        # Wildcard timeframe means: select all timeframes that actually exist
         if '*' in base_timeframes:
-            timeframes_specs = available_timeframes[:]  # expand to full set
-            base_timeframes = available_timeframes[:]   # same as above
+            timeframes_specs = available_timeframes[:]  
+            base_timeframes = available_timeframes[:]   
 
-        # Convert wildcard pattern to regex for symbol matching
+        # Convert wildcard symbol pattern to a regex (e.g. "BTC*" → "^BTC.*$")
         regex_pattern = symbol_pattern.replace('.', r'\.').replace('*', r'.*')
 
-        # Match symbols based on wildcard-expanded regex
+        # Find all actual symbols matching user pattern
         matches = [s for s in available_symbols if re.fullmatch(regex_pattern, s)]
+
+        # If no symbol matched user request, track for reporting (unless --force)
         if not matches:
-            # Track selections that matched no symbol, useful for error reporting
             all_requested_pairs_base.add((symbol_pattern, timeframes_str))
 
         for symbol in matches:
             for tf_spec in timeframes_specs:
-                base_tf = tf_spec.split(':')[0]       # base timeframe
-                modifier = tf_spec.split(':')[1] if ':' in tf_spec else None  # optional modifier
+                base_tf = tf_spec.split(':')[0]       # Bare timeframe
+                modifier = tf_spec.split(':')[1] if ':' in tf_spec else None  # Optional modifier
 
                 requested_base = (symbol, base_tf)
                 all_requested_pairs_base.add(requested_base)
 
-                # Find the actual file path for this (symbol, base_tf)
                 if requested_base in available_pairs:
-                    # Iterate original FS metadata to get exact path for the pair
+                    # Locate its file path in the filesystem metadata
                     for tup in all_available_data:
                         if tup[0] == symbol and tup[1] == base_tf:
-                            # Append (symbol, full tf_spec, file path, modifier)
-                            final_selections.append((symbol, base_tf, tup[2], modifier))
+                            new_task = (symbol, base_tf, tup[2], modifier)
+
+                            # Pull existing task's modifier, if any
+                            current_modifier = priority_map.get(
+                                requested_base, (None, None, None, None)
+                            )[3]
+                            #   - If no modifier yet, or new entry *has* a modifier → overwrite
+                            #   - If existing entry already had a modifier and new one does not → keep existing
+                            if current_modifier is None or modifier is not None:
+                                priority_map[requested_base] = new_task
                             break
+    
+    # Convert deduplicated selection map to list
+    final_selections = list(priority_map.values())
 
-    # Extract only base timeframe (strip modifiers) for resolution checking
-    resolved_pairs = {(d[0], d[1].split(':')[0]) for d in final_selections}
-
-    # Determine which requested pairs could not be matched to actual data
+    # Determine which requests never resolved to real files
+    resolved_pairs = set(priority_map.keys())
     unresolved_pairs = sorted(all_requested_pairs_base - resolved_pairs)
 
     if unresolved_pairs and not args.force:
+        # Build detailed error message showing unresolved symbol/timeframe specs
         error_msg_pairs = []
         for sym, tf_spec in unresolved_pairs:
-            # Attempt to find how the user originally wrote the timeframe (with modifiers)
-            original_spec = next((s for s in timeframes_specs if s.startswith(tf_spec)), tf_spec)
-            error_msg_pairs.append(f"- {sym}/{original_spec}\n")
+            error_msg_pairs.append(f"- {sym}/{tf_spec}\n") 
         
         msg = (
             "\nCritical Error: The following selections match no existing files:\n"
@@ -348,7 +359,7 @@ def parse_args():
         parser.error(msg)
     
     return {
-        'select_data': sorted(set(final_selections), key=lambda x: (x[0], x[1], x[2], x[3] if x[3] is not None else "")),   # sorted unique selections
+        'select_data': sorted(final_selections), 
         'partition': args.partition,
         'output_dir': args.output_dir,
         'dry_run': args.dry_run,
