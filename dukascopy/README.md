@@ -437,11 +437,29 @@ Example usage
 --until "2025-12-01 12:00:00" --omit-open-candles --output my_cool_parquet_file.parquet --compression zstd
 ```
 
-- --select specifies symbols and timeframes (multiple selections allowed).
-- --after and --until filter data by timestamp.
-- --omit-open-candles excludes the most recent open candle.
-- --output defines the Parquet file or directory name.
-- --compression sets the Parquet compression format (default zstd).
+```sh
+usage: build-parquet.sh [-h] --select SYMBOL/TF1,TF2,... [--after AFTER] [--until UNTIL] (--output FILE_PATH | --output_dir DIR_PATH) [--compression {snappy,gzip,brotli,zstd,lz4,none}] [--omit-open-candles]
+              [--force] [--dry-run] [--partition] [--keep-temp]
+
+Batch extraction utility for symbol/timeframe datasets.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --select SYMBOL/TF1,TF2,...
+                        Symbol/timeframe selection pattern. Supports '*' wildcards.
+  --after AFTER         Start date/time (inclusive). Format: YYYY-MM-DD HH:MM:SS (Default: 1970-01-01 00:00:00)
+  --until UNTIL         End date/time (exclusive). Format: YYYY-MM-DD HH:MM:SS (Default: 3000-01-01 00:00:00)
+  --output FILE_PATH    Write a single merged Parquet file.
+  --output_dir DIR_PATH
+                        Write a partitioned Parquet dataset.
+  --compression {snappy,gzip,brotli,zstd,lz4,none}
+                        Compression codec for Parquet output.
+  --omit-open-candles   Drop the newest candle if incomplete.
+  --force               Allow patterns that match no files (Testing)
+  --dry-run             Parse/resolve arguments only; do not run extraction. (Missing)
+  --partition           Enable Hive-style partitioned output (requires --output_dir).
+  --keep-temp           Retain intermediate files.
+```
 
 **Schema:**
 
