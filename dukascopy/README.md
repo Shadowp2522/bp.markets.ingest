@@ -839,6 +839,23 @@ Thank you for using this toolkit. The goal of the project is simple: provide a f
 
 A more advanced, tick-ready successor—planned as a C++ DuckDB extension—is under development and will be announced when ready.
 
+## Legal Disclaimer
+
+This software is provided for **educational and research purposes only**. 
+
+**Important Notice:**
+- This tool accesses data provided freely by Dukascopy Bank SA
+- Users must comply with Dukascopy's Terms of Service
+- This software does not redistribute Dukascopy's raw data
+- Users are responsible for ensuring their use complies with applicable laws
+- The author is not affiliated with Dukascopy Bank SA
+
+**Usage Restrictions:**
+- Do not use this tool for commercial data redistribution
+- Do not use this tool to create competing services
+- Respect rate limits and server load considerations
+- Commercial users should obtain proper data licenses
+
 ## License
 
 This software is licensed under the MIT License.
