@@ -175,10 +175,14 @@ def parse_args():
         help="Symbol/timeframe selection pattern. Supports '*' wildcards."
     )
 
-    parser.add_argument('--after', type=str,
-                        help="Start date/time (inclusive). Format: YYYY-MM-DD HH:MM:SS")
-    parser.add_argument('--until', type=str,
-                        help="End date/time (exclusive). Format: YYYY-MM-DD HH:MM:SS")
+    # Makes the conditionals easier in fork_extract
+    DEFAULT_AFTER = "1970-01-01 00:00:00"
+    DEFAULT_UNTIL = "3000-01-01 00:00:00"
+
+    parser.add_argument('--after', type=str, default=DEFAULT_AFTER,
+                    help=f"Start date/time (inclusive). Format: YYYY-MM-DD HH:MM:SS (Default: {DEFAULT_AFTER})")
+    parser.add_argument('--until', type=str, default=DEFAULT_AFTER,
+                    help=f"End date/time (exclusive). Format: YYYY-MM-DD HH:MM:SS (Default: {DEFAULT_UNTIL})")
 
     # Exactly one output mode must be chosen
     output_group = parser.add_mutually_exclusive_group(required=True)
