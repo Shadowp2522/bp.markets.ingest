@@ -459,7 +459,7 @@ Example usage
 - Ideal for complex analyses and large datasets.
 - Supports partitioning by symbol and year for optimized querying.
 
->Use build-parquet.sh to convert raw CSV data into a format that’s ready for high-performance analysis.
+>Use build-parquet.sh to convert raw CSV data into a format that’s ready for high-performance analysis. Use a quoted ```--select "*/*"``` if you need to export all symbols, all timeframes, within a date-range.
 
 ---
 
