@@ -18,6 +18,8 @@
 - [Output schema](#output-schema)
   - Details on generated files
 - [Quick Check](#quick-check)
+- [Parquet converter](#parquet-converter-v04-and-above)
+  - Details on CSV->Parquet conversion
 - [Performance Benchmarks](#performance-benchmarks)
   - Cold Run (Full History)
   - Incremental Daily Update
@@ -147,6 +149,7 @@ For this Dukascopy Data Pipeline project, the Python dependencies that need to b
 
 | Package    | Version    | Purpose                                                                      |
 |----------- |----------- |---------------------------------------------------------------------------- |
+| `duckdb`   | >=1.3.2    | Analytical database layer on top of CSV + parquet building helper           |
 | `pandas`   | >=2.0.3    | CSV I/O, data manipulation, aggregation, and incremental loading           |
 | `numpy`    | >=1.24.4   | Vectorized numeric computations, cumulative OHLC calculations              |
 | `orjson`   | >=3.10.15  | Fast JSON parsing for delta-encoded files                                   |
@@ -416,6 +419,89 @@ The open candle will always be the last row in the CSV. If you prefer not to inc
 
 ---
 
+## Parquet converter (v0.4 and above)
+
+A powerful new utility, build-parquet.sh, allows you to generate high-performance .parquet files or partitioned Hive-style Parquet datasets based on your selection criteria.
+
+**Note:** for this utility to work you need to install DuckDB
+
+```sh
+pip install -r requirements.txt
+```
+
+Example usage
+
+```sh
+./build-parquet.sh --select EUR-USD/1m --select EUR-NZD/4h:skiplast,8h:skiplast --select BRENT.CMD-USD/15m,30m \
+--select BTC-*/15m --select DOLLAR.IDX-USD/1h,4h --after "2025-01-01 00:00:00" \
+--until "2025-12-01 12:00:00" --output my_cool_parquet_file.parquet --compression zstd
+```
+
+```sh
+usage: build-parquet.sh [-h] --select SYMBOL/TF1,TF2:modifier,... [--after AFTER]
+              [--until UNTIL] (--output FILE_PATH | --output_dir DIR_PATH)
+              [--compression {snappy,gzip,brotli,zstd,lz4,none}] [--force] 
+              [--dry-run] [--partition] [--keep-temp]
+
+Batch extraction utility for symbol/timeframe datasets.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --select SYMBOL/TF1,TF2:modifier,...
+                        Defines how symbols and timeframes are selected. Wildcards (*) are supported.
+                        The skiplast modifier can be applied to exclude the last row of a timeframe.
+  --after AFTER         Start date/time (inclusive). Format: YYYY-MM-DD HH:MM:SS (Default: 1970-01-01 00:00:00)
+  --until UNTIL         End date/time (exclusive). Format: YYYY-MM-DD HH:MM:SS (Default: 3000-01-01 00:00:00)
+  --output FILE_PATH    Write a single merged Parquet file.
+  --output_dir DIR_PATH
+                        Write a partitioned Parquet dataset.
+  --compression {snappy,gzip,brotli,zstd,lz4,none}
+                        Compression codec for Parquet output.
+  --force               Allow patterns that match no files.
+  --dry-run             Parse/resolve arguments only; do not run extraction.
+  --partition           Enable Hive-style partitioned output (requires --output_dir).
+  --keep-temp           Retain intermediate files.
+
+```
+
+**Schema:**
+
+| Column | Type (Implied) | Type (Explicit) |
+| :--- | :--- | :--- |
+| symbol | Varchar (String) | VARCHAR (or STRING) |
+| timeframe | Varchar (String) | VARCHAR (or STRING) |
+| time | Timestamp (Timestamp) | TIMESTAMP |
+| open, high, low, close | Double | DOUBLE |
+| volume | Double | DOUBLE |
+
+**Benefits:**
+
+- Queries on Parquet are 25-50× faster than on CSV files.
+- Ideal for complex analyses and large datasets.
+- Supports partitioning by symbol and year for optimized querying.
+
+>Use build-parquet.sh to convert raw CSV data into a format that’s ready for high-performance analysis. Use a quoted ```--select "*/*"``` if you need to export all symbols, all timeframes, within a date-range.
+
+```sh
+python3 -c "
+import duckdb
+df = duckdb.sql(\"\"\"
+    SELECT * FROM 'my_cool_parquet_file.parquet' WHERE timeframe='1m' AND symbol='EUR-USD' ORDER BY time DESC LIMIT 40;
+  \"\"\").df()
+print(df)
+"
+```
+
+**Advice:** For large selects, eg. a select ```"*/*"``` from 2005 until now: use output_dir (a hive). It will o/w likely choke on the merge. This is an edge case (select everything to a single parquet file) which we will not support atm. If it's really needed. For (very!) good reasons, drop me a line and i will see what i can do. A hive is the current solution for huge exports.
+
+>**❗Use the modifier ```skiplast``` to control whether the last (potentially open) candle should be dropped from a timeframe. \
+❗Skiplast only has effect when --until is not set or set to a future datetime**
+
+You now have your own local forex high-performance analytics and data stack :)
+Don't forget to thank Dukascopy.
+
+---
+
 ## Performance Benchmarks
 
 ### Cold Run (Full Update)
@@ -562,39 +648,11 @@ START_DATE=2005-01-01 ./run.sh
 
 ## Notes and Future Work
 
->Parquet converter (helper tool to (significantly) increase analytics performance (up to 25x) in DuckDB, soon)
-
 >HTTP API for OHLC retrieval
 
 >Cascaded indicator engine
 
->Central backfill detection and redistribution service? Using Github? 
-
 >MSSIB Extension for DuckDB
-
----
-
-## Teaser on Parquet converter
-
-This is me thinking out loud: imagine a command-line tool that lets you choose symbols and timeframes, then compiles everything into a single Parquet file. The idea is that this would enable inter-symbol and inter-timeframe queries at roughly 25-50× the speed of the current setup.
-
-```sh
-./build-parquet.sh --select EUR-USD/1m --select EUR-NZD/4h,8h --select BRENT.CMD-USD/15m,30m \
---select BTC-*/15m --select DOLLAR.IDX-USD/1h,4h --after "2025-01-01 00:00:00" \
---until "2025-12-01 12:00:00"  --output my_cool_parquet_file.parquet --compression zstd
-```
-
-Schema in parquet:
-
-```sh
-symbol,timeframe,timestamp,open,high,low,close,volume
-```
-
-I need a bit of extra performance for intra-symbol and intra-timeframe querying in my analysis. I'm going to build this—just not sure exactly when yet. Soon.
-
-I'm not sure exactly how fast I can make it, but trust me—it will be as fast as humanly possible.
-
-**Update:** There is a beta version available in staging/0.4. If you want to use it already. I am still testing it extensively and some additional performance updates may be incoming. Testing will take a bit before i release this to the main branch.
 
 ---
 
@@ -780,6 +838,23 @@ It was actually correct and it gives you the information on how it came to it's 
 Thank you for using this toolkit. The goal of the project is simple: provide a fast and fully transparent pipeline for high-quality historical market data. **This architecture prioritizes speed and simplicity via CSV output over the analytical performance of enterprise binary formats.** If you have ideas, find issues, or want to contribute, feel free to open a GitHub issue or pull request.
 
 A more advanced, tick-ready successor—planned as a C++ DuckDB extension—is under development and will be announced when ready.
+
+## Legal Disclaimer
+
+This software is provided for **educational and research purposes only**. 
+
+**Important Notice:**
+- This tool accesses data provided freely by Dukascopy Bank SA
+- Users must comply with Dukascopy's Terms of Service
+- This software does not redistribute Dukascopy's raw data
+- Users are responsible for ensuring their use complies with applicable laws
+- The author is not affiliated with Dukascopy Bank SA
+
+**Usage Restrictions:**
+- Do not use this tool for commercial data redistribution
+- Do not use this tool to create competing services
+- Respect rate limits and server load considerations
+- Commercial users should obtain proper data licenses
 
 ## License
 
