@@ -29,6 +29,7 @@
 - [Troubleshooting](#troubleshooting)
   - Stale Locks
   - Full Rebuild
+  - Alignment
 - [Future Work](#notes-and-future-work)
 - [DuckDB Analytical Layer (Advanced)](#duckdb-advanced-users)
 - [Bug Tracking](#bug-tracking)
@@ -644,6 +645,16 @@ START_DATE=2005-01-01 ./run.sh
 - **Slow incremental?** Check if NVMe/SSD. HDDs will be 10-50x slower
 - **High CPU?** Reduce `NUM_PROCESSES` in scripts
 - **Out of memory?** Reduce `BATCH_SIZE` in resample.py (default: 500K)
+
+### Alignment, candles "don't exactly match your broker"
+
+The dataset is built 100% from Dukascopy SA Bank's official feed — the same feed that powers their own charts, Metatrader and JForex platform.
+
+If your broker's candles look different, that's because **your broker is not Dukascopy**.
+
+There is exactly ```one guaranteed way``` to get perfect, bit-for-bit alignment with the dataset:
+
+→ Become a client of Dukascopy.
 
 ---
 
