@@ -842,10 +842,6 @@ A more advanced, tick-ready successor—planned as a C++ DuckDB extension—is u
 
 ## Legal Disclaimer
 
-This software is provided for **educational and research purposes only**. It does not provide trading advice or execution functionality.
-
-## Legal Disclaimer
-
 This software is provided "as is" for educational and research purposes only. It does not constitute trading advice, investment recommendations, or execution functionality.
 
 ### Important Notice
