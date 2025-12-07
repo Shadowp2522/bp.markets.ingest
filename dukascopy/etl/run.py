@@ -180,7 +180,7 @@ def require_tos_acceptance():
             return True  # Return success
             
         elif response in ['no', 'n']:
-            print("\n✗ Terms were not accepted. Aborting Parquet export.")
+            print("\n✗ Terms were not accepted. Aborting.")
             sys.exit(1) # Exit the script with a non-zero status code (error)
             
         else:
