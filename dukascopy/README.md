@@ -846,7 +846,7 @@ This software is provided "as is" for educational and research purposes only. It
 
 ### Important Notice
 - This tool downloads and processes data that is freely provided by Dukascopy Bank SA.
-- Users are solely responsible for complying with Dukascopy's Terms of Service and all applicable laws.
+- Users are solely responsible for complying with Dukascopy's [Terms of Service](https://www.dukascopy.com/swiss/english/legal-pages/terms-of-use/) and all applicable laws.
 - The author is not affiliated with Dukascopy Bank SA.
 - This software itself does not redistribute Dukascopy's raw data.
 
