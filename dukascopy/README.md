@@ -30,6 +30,7 @@
   - Stale Locks
   - Full Rebuild
   - Alignment
+  - **Rate limits applied**
 - [Future Work](#notes-and-future-work)
 - [DuckDB Analytical Layer (Advanced)](#duckdb-advanced-users)
 - [Bug Tracking](#bug-tracking)
@@ -47,7 +48,9 @@ git fetch origin
 git reset --hard origin/main
 ```
 
->Note: when you use the default configuration, data-points are now exactly aligned to https://www.dukascopy.com/swiss/english/marketwatch/charts/
+>**Note:** when you use the default configuration, data-points are now exactly aligned to https://www.dukascopy.com/swiss/english/marketwatch/charts/
+
+>**Also:** rate limits have been added, see [here](#downloads-appear-slower-after-updating-to-the-latest-version)
 
 ## Notice
 
@@ -264,6 +267,7 @@ download:
   max_retries: 3                      # Number of retries before downloader raises
   backoff_factor: 2                   # Exponential backoff factor (wait time)
   timeout: 10                         # Request timeout
+  rate_limit_rps: 1                   # Protect end-point (number of cores * rps = requests/second)
   paths:
     historic: cache                   # Historical downloads
     live: data/temp                   # Live downloads
@@ -655,6 +659,28 @@ If your broker's candles look different, that's because **your broker is not Duk
 There is exactly ```one guaranteed way``` to get perfect, bit-for-bit alignment with the dataset:
 
 → Become a client of Dukascopy.
+
+### Downloads appear slower after updating to the latest version
+
+This slowdown is caused by a newly introduced rate_limit_rps flag in config.yaml. If you use a custom config.user.yaml, this flag may not be set in the downloads section. In that case, it falls back to the default value of 0.5, which is intentionally conservative and results in slow download speeds. You can safely adjust this value, but keep it reasonable. For an initial full sync, expect to wait a few hours.
+
+To estimate an appropriate rate_limit_rps, you can use the following formulas:
+
+```python
+(number_of_symbols * 365 * 20) / (cpu_cores * rate_limit_rps) = num_seconds_to_download
+
+OR -simplified
+
+rate_limit_rps = (number_of_symbols * 73 / 36) / (cpu_cores * hours)
+```
+
+**Example:** You want to run the full initial sync overnight, giving you about 8 hours. You have 25 symbols configured and a 16-core machine.
+
+```python
+rate_limit_rps = (25 * 73 / 36) / (16 * 8) = 50.69 / 128 = 0.39 (requests per second =~ 6 (0.39 * 16 cores))
+```
+
+After initial sync, you can up the value to 1. Rate limits were introduced due to the project’s growing popularity.
 
 ---
 

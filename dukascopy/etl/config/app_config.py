@@ -76,6 +76,7 @@ class DownloadConfig:
     max_retries: int = 3
     backoff_factor: int = 2
     timeout: int = 10
+    rate_limit_rps: float = 0.5
     paths: DownloadPaths = field(default_factory=DownloadPaths)
 
 @dataclass

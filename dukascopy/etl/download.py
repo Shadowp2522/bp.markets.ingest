@@ -35,6 +35,7 @@ from config.app_config import AppConfig, DownloadConfig, load_app_config
 ENABLE_BACKFILL_FILTER = True  # We do not support backfilling atm. Forward only pipeline.
 
 session = None                 # Session per worker
+last_request_time = 0.0        # Rate-limit helper
 
 def download_filter_backfilled_items(temp_path: Path, cache_path: Path) -> bool:
     """
@@ -132,6 +133,7 @@ def download_symbol(symbol: str, dt: date, app_config: AppConfig) -> bool:
     - Creates folders automatically if missing.
     """
     global session # Session per worker
+    global last_request_time  # Rate-limit per worker helper
 
     if session is None:
         session = requests.Session()   # Create session ONCE per worker
@@ -158,6 +160,15 @@ def download_symbol(symbol: str, dt: date, app_config: AppConfig) -> bool:
     # Attempt the download with retry logic
     for attempt in range(config.max_retries):
         try:
+            # Protect the end point
+            min_interval = 1.0 / config.rate_limit_rps if config.rate_limit_rps > 0 else 0
+            
+            time_since_last = time.monotonic() - last_request_time
+            sleep_needed = max(0, min_interval - time_since_last)
+            
+            if sleep_needed > 0:
+                time.sleep(sleep_needed)
+
             # Perform HTTP GET request
             response = session.get(url, 
                 headers={
@@ -167,6 +178,9 @@ def download_symbol(symbol: str, dt: date, app_config: AppConfig) -> bool:
                 timeout=config.timeout
             )
             response.raise_for_status()
+
+            # Request successful, update last_request_time
+            last_request_time = time.monotonic()
             break
         except requests.exceptions.RequestException as e:
             if attempt < config.max_retries - 1:
