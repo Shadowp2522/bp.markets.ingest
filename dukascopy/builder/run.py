@@ -395,6 +395,21 @@ def require_tos_acceptance():
     if Path("cache/HAS_ACCEPTED_TERMS_OF_SERVICE").exists():
         return True
 
+    print("\n" + "="*70)
+    print("🚀 SCALING RESPONSIBLY: WHY TERMS ARE REQUIRED")
+    print("="*70)
+    print("\nThis project has grown unexpectedly fast:\n")
+    print("• 2,000+ clones in 14 days")
+    print("• 200+ new clones daily")
+    print("• Enterprise-grade data capabilities (Parquet export)")
+    print("\nWith scale comes responsibility. These terms ensure:\n")
+    print("✅ The project can continue serving educational/research users")
+    print("✅ Everyone uses financial data responsibly")
+    print("✅ We respect data provider terms and conditions")
+    print("✅ The tool remains available long-term")
+    print("\nThis is normal professional practice for successful open-source")
+    print("tools. Thank you for helping us scale responsibly!\n")
+
     print("=" * 70)
     print("TERMS OF SERVICE & LEGAL DISCLAIMER")
     print("=" * 70)
