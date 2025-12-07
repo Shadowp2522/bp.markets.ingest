@@ -33,6 +33,7 @@
 - [DuckDB Analytical Layer (Advanced)](#duckdb-advanced-users)
 - [Bug Tracking](#bug-tracking)
 - [Final Word](#final-word)
+- [Legal Disclaimer](#legal-disclaimer)
 - [License](#license)
 
 
