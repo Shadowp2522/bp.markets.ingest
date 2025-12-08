@@ -216,7 +216,7 @@ def parse_args():
         action='append',
         required=True,
         metavar='SYMBOL/TF1,TF2:modifier,...',
-        help="Defines how symbols and timeframes are selected. Wildcards (*) are supported.\nThe skiplast modifier can be applied to exclude the last row of a timeframe."
+        help="Defines how symbols and timeframes are selected. Wildcards (*) are NOT supported.\nThe skiplast modifier can be applied to exclude the last row of a timeframe."
     )
 
     DEFAULT_AFTER = "1970-01-01 00:00:00"

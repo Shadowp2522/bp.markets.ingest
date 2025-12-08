@@ -456,7 +456,7 @@ Batch extraction utility for symbol/timeframe datasets.
 optional arguments:
   -h, --help            show this help message and exit
   --select SYMBOL/TF1,TF2:modifier,...
-                        Defines how symbols and timeframes are selected. Wildcards (*) are supported.
+                        Defines how symbols and timeframes are selected. Wildcards (*) are NOT supported.
                         The skiplast modifier can be applied to exclude the last row of a timeframe.
   --after AFTER         Start date/time (inclusive). Format: YYYY-MM-DD HH:MM:SS (Default: 1970-01-01 00:00:00)
   --until UNTIL         End date/time (exclusive). Format: YYYY-MM-DD HH:MM:SS (Default: 3000-01-01 00:00:00)
