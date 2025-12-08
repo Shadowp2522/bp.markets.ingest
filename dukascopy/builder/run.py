@@ -302,7 +302,10 @@ def parse_args():
 
         # Wildcard timeframes, select all timeframes that actually exist
         is_wildcard_select = any('*' in tf_spec.split(':')[0] for tf_spec in timeframes_specs)
+
         if is_wildcard_select:
+            print("The * timeframe wildcard is currently unsupported")
+            raise
             # We have a wildcard
             wildcard_modifier = ''
             # Loop through specs to get *:modifier
@@ -318,6 +321,12 @@ def parse_args():
             timeframes_specs = [f"{tf}{wildcard_modifier}" for tf in available_timeframes]
             base_timeframes = available_timeframes[:] # This line is now correct
         
+        # Temporarily disable wildcard select
+        if '*' in symbol_pattern:
+            print("The * symbol wildcard is currently unsupported")
+            raise
+
+
         # Convert wildcard symbol pattern to a regex (e.g. "BTC*" → "^BTC.*$")
         regex_pattern = symbol_pattern.replace('.', r'\.').replace('*', r'.*')
 
@@ -546,6 +555,8 @@ def main():
         print("\nExport complete!")
         print(f"Total runtime: {elapsed:.2f} seconds ({elapsed/60:.2f} minutes)")
 
+    except Exception:
+        print("Error")
     except KeyboardInterrupt:
         print("")
         return False
