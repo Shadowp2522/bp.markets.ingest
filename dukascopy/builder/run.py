@@ -216,7 +216,7 @@ def parse_args():
         action='append',
         required=True,
         metavar='SYMBOL/TF1,TF2:modifier,...',
-        help="Defines how symbols and timeframes are selected. Wildcards (*) are supported.\nThe skiplast modifier can be applied to exclude the last row of a timeframe."
+        help="Defines how symbols and timeframes are selected. Wildcards (*) are NOT supported.\nThe skiplast modifier can be applied to exclude the last row of a timeframe."
     )
 
     DEFAULT_AFTER = "1970-01-01 00:00:00"
@@ -304,6 +304,8 @@ def parse_args():
         is_wildcard_select = any('*' in tf_spec.split(':')[0] for tf_spec in timeframes_specs)
 
         if is_wildcard_select:
+            print("The * timeframe wildcard is currently unsupported")
+            raise
             # We have a wildcard
             wildcard_modifier = ''
             # Loop through specs to get *:modifier
@@ -318,6 +320,12 @@ def parse_args():
             # Append the modifier to each timeframe 
             timeframes_specs = [f"{tf}{wildcard_modifier}" for tf in available_timeframes]
             base_timeframes = available_timeframes[:] # This line is now correct
+        
+        # Temporarily disable wildcard select
+        if '*' in symbol_pattern:
+            print("The * symbol wildcard is currently unsupported")
+            raise
+
 
         # Convert wildcard symbol pattern to a regex (e.g. "BTC*" → "^BTC.*$")
         regex_pattern = symbol_pattern.replace('.', r'\.').replace('*', r'.*')
