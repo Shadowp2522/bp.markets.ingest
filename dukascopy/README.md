@@ -441,7 +441,7 @@ Example usage
 
 ```sh
 ./build-parquet.sh --select EUR-USD/1m --select EUR-NZD/4h:skiplast,8h:skiplast --select BRENT.CMD-USD/15m,30m \
---select BTC-*/15m --select DOLLAR.IDX-USD/1h,4h --after "2025-01-01 00:00:00" \
+--select BTC-USD/15m --select DOLLAR.IDX-USD/1h,4h --after "2025-01-01 00:00:00" \
 --until "2025-12-01 12:00:00" --output my_cool_parquet_file.parquet --compression zstd
 ```
 
@@ -488,7 +488,7 @@ optional arguments:
 - Ideal for complex analyses and large datasets.
 - Supports partitioning by symbol and year for optimized querying.
 
->Use build-parquet.sh to convert raw CSV data into a format that’s ready for high-performance analysis. Use a quoted ```--select "*/*"``` if you need to export all symbols, all timeframes, within a date-range.
+>Use build-parquet.sh to convert raw CSV data into a format that’s ready for high-performance analysis.
 
 ```sh
 python3 -c "
@@ -500,7 +500,7 @@ print(df)
 "
 ```
 
-**Advice:** For large selects, eg. a select ```"*/*"``` from 2005 until now: use output_dir (a hive). It will o/w likely choke on the merge. This is an edge case (select everything to a single parquet file) which we will not support atm. If it's really needed. For (very!) good reasons, drop me a line and i will see what i can do. A hive is the current solution for huge exports.
+**Advice:** For large selects, use a hive.
 
 >**❗Use the modifier ```skiplast``` to control whether the last (potentially open) candle should be dropped from a timeframe. \
 ❗Skiplast only has effect when --until is not set or set to a future datetime**
