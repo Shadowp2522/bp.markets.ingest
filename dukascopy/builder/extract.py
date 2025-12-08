@@ -44,12 +44,12 @@ from typing import Tuple, Dict, Any
 
 # Define the expected schema for Dukascopy data
 DUKASCOPY_CSV_SCHEMA = {
-    'Time': 'TIMESTAMP',
-    'Open': 'DOUBLE',
-    'High': 'DOUBLE',
-    'Low': 'DOUBLE',
-    'Close': 'DOUBLE',
-    'Volume': 'DOUBLE',
+    'time': 'TIMESTAMP',
+    'open': 'DOUBLE',
+    'high': 'DOUBLE',
+    'low': 'DOUBLE',
+    'close': 'DOUBLE',
+    'volume': 'DOUBLE',
 }
 
 CSV_TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M:%S'
@@ -75,12 +75,12 @@ def extract_symbol(task: Tuple[str, str, str, str, str, str, Dict[str, Any]]) ->
         '{symbol}'::VARCHAR AS symbol,
         '{timeframe}'::VARCHAR AS timeframe,
         CAST(strftime(Time, '%Y') AS VARCHAR) AS year,  -- extract year for partitioning
-        strptime(CAST(Time AS VARCHAR), '{CSV_TIMESTAMP_FORMAT}') AS Time,  -- convert CSV timestamp string to TIMESTAMP
-        Open,
-        High,
-        Low,
-        Close,
-        Volume
+        strptime(CAST(Time AS VARCHAR), '{CSV_TIMESTAMP_FORMAT}') AS time,  -- convert CSV timestamp string to TIMESTAMP
+        open,
+        high,
+        low,
+        close,
+        volume
     """
 
     # Use the schema's first key as the timestamp column name
