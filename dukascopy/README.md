@@ -690,6 +690,8 @@ After initial sync, you can up the value to 1. Rate limits were introduced due t
 
 >HTTP API for OHLC retrieval
 
+>Replay functionality?
+
 >Cascaded indicator engine
 
 >MSSIB Extension for DuckDB
