@@ -458,7 +458,9 @@ def parse_args():
         parser.error(msg)
     
     # fix compression = none -> uncompressed
-    if args.compression == "none":
+    # bug/todo: compression-mode CSV fails (no compression supported atm for CSV) on merge
+    # check that select statement (in copy to, see above) for incoming CSV compression support
+    if args.compression == "none" or args.output_type == "csv":
         args.compression = "uncompressed"
 
     return {
