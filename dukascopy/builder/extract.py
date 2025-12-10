@@ -56,50 +56,130 @@ CSV_TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M:%S'
 
 def extract_symbol(task: Tuple[str, str, str, str, str, str, Dict[str, Any]]) -> bool:
     """
-    Extracts, filters, transforms, and exports a single CSV file to a 
-    partitioned Parquet dataset using a single DuckDB COPY statement.
+    Process a single Dukascopy CSV file and export it to Parquet or CSV using
+    a single DuckDB COPY statement.
+
+    This function performs the full extract–transform–load (ETL) pipeline for one
+    (symbol, timeframe) input file:
+
+    **Operations performed**
+    - Reads the raw Dukascopy CSV using `read_csv_auto` with a predefined schema.
+    - Applies a timestamp filter: `[after_str, until_str)`.
+    - Optionally excludes the final timestamp if `modifier == "skiplast"`.
+    - Injects metadata columns: `symbol`, `timeframe`, and `year`.
+    - Normalizes the timestamp column to DuckDB's TIMESTAMP type.
+    - Writes output in a *single COPY command* to:
+        • A partitioned Parquet dataset (`symbol` / `year`), or  
+        • A partitioned CSV directory (`symbol` / `year`), or  
+        • A single unpartitioned CSV file per worker.
+
+    **Parameters**
+    - `task`: 7-tuple containing:
+        1. `symbol` (str) — Asset symbol (e.g., `"EURUSD"`).
+        2. `timeframe` (str) — Bar interval (e.g., `"1m"`).
+        3. `input_filepath` (str) — Path to the raw Dukascopy CSV file.
+        4. `after_str` (str) — Start time (inclusive), formatted as a timestamp.
+        5. `until_str` (str) — End time (exclusive), formatted as a timestamp.
+        6. `modifier` (str) — Optional processing flag (currently `"skiplast"`).
+        7. `options` (dict) — Export configuration:
+            - `output_type`: `"parquet"` (default) or `"csv"`.
+            - `partition`: Whether to partition CSV output.
+            - `compression`: Compression codec (default `"zstd"`).
+            - `output_dir`: Root directory for exported data.
+            - `dry_run`: If true, prints planned operation and exits.
+
+    **Returns**
+    - `True` if the export succeeded.
+    - `False` if `dry_run=True` and execution was skipped.
+
+    **Notes**
+    - All DuckDB work is executed inside an in-memory temporary database.
+    - The function writes directly to disk using DuckDB `COPY ... TO` and
+      does not load data into Python memory.
+    - Parquet output is *always partitioned* by `(symbol, year)`.
     """
+
+    # Unpack task parameters
     symbol, timeframe, input_filepath, after_str, until_str, modifier, options = task
 
+    # Normalize output configuration
+    output_type = options.get('output_type', 'parquet').upper()
+    is_partitioned = options.get('partition', False)
+    compression = options.get('compression', 'zstd').upper()
+    
+    # Dry-run mode prints planned execution and exits early
     if options['dry_run']:
-        print(f"DRY-RUN: {symbol}/{timeframe} => {input_filepath} (modifier: {modifier})")
+        print(f"DRY-RUN: {symbol}/{timeframe} => {input_filepath} (mode: {output_type}, modifier: {modifier})")
         return False
 
-    root_output_dir = options.get('output_dir', './temp/parquet')
+    # Determine root output directory and ensure it exists
+    root_output_dir = options.get('output_dir', f'./data/temp/{output_type.lower()}')
+    Path(root_output_dir).mkdir(parents=True, exist_ok=True)
 
-    if not Path(root_output_dir).exists():
-        # Ensure parent folder exists; DuckDB will create final partitions
-        Path(root_output_dir).parent.mkdir(parents=True, exist_ok=True)
+    # Select output path and COPY-format settings based on output type
+    if output_type == 'PARQUET':
+        # Always partitioned (symbol/year)
+        output_path = root_output_dir
+        format_options = f"""
+            FORMAT PARQUET,
+            PARTITION_BY (symbol, year),
+            FILENAME_PATTERN 'part_{{uuid}}',
+            COMPRESSION '{compression}',
+            OVERWRITE_OR_IGNORE
+        """
+        
+    elif output_type == 'CSV':
+        if is_partitioned:
+            # Partitioned CSV output
+            output_path = root_output_dir
+            format_options = f"""
+                FORMAT CSV,
+                PARTITION_BY (symbol, year),
+                FILENAME_PATTERN 'part_{{uuid}}.csv',
+                COMPRESSION '{compression}',
+                HEADER true,
+                DELIMITER ',',
+                OVERWRITE_OR_IGNORE
+            """
+        else:
+            # Each worker writes its own temp CSV file
+            output_path = str(Path(root_output_dir) / f"{symbol}_{timeframe}_{uuid.uuid4()}.csv")
+            format_options = f"""
+                FORMAT CSV,
+                COMPRESSION '{compression}',
+                HEADER true,
+                DELIMITER ',',
+                OVERWRITE_OR_IGNORE
+            """
+    else:
+        raise ValueError(f"Unsupported output type: {output_type}")
 
+    # Column selection + computed fields inserted into the output
     select_columns = f"""
         '{symbol}'::VARCHAR AS symbol,
         '{timeframe}'::VARCHAR AS timeframe,
-        CAST(strftime(Time, '%Y') AS VARCHAR) AS year,  -- extract year for partitioning
-        strptime(CAST(Time AS VARCHAR), '{CSV_TIMESTAMP_FORMAT}') AS time,  -- convert CSV timestamp string to TIMESTAMP
-        open,
-        high,
-        low,
-        close,
-        volume
+        CAST(strftime(Time, '%Y') AS VARCHAR) AS year, 
+        strptime(CAST(Time AS VARCHAR), '{CSV_TIMESTAMP_FORMAT}') AS time, 
+        open, high, low, close, volume
     """
 
-    # Use the schema's first key as the timestamp column name
+    # Raw time column from the Dukascopy schema (first column)
     time_column_name = list(DUKASCOPY_CSV_SCHEMA.keys())[0]
 
-    # Time filtering is done at SQL level instead of Python-level reading
+    # Basic time filter window
     where_clause = f"""
         WHERE {time_column_name} >= TIMESTAMP '{after_str}'
           AND {time_column_name} < TIMESTAMP '{until_str}'
     """
 
+    # Optional modifier: skip the latest timestamp from the CSV
     if modifier == "skiplast":
-        # Exclude the last row's timestamp (used for some incomplete timeframe windows)
         where_clause += (
             f" AND {time_column_name} < (SELECT MAX({time_column_name}) "
             f"FROM read_csv_auto('{input_filepath}'))"
         )
 
-    # read_csv_auto runs inside DuckDB, not in Python—keeps everything in one COPY statement
+    # DuckDB read_csv_auto call with predefined schema
     read_csv_sql = f"""
         SELECT *
         FROM read_csv_auto(
@@ -108,29 +188,26 @@ def extract_symbol(task: Tuple[str, str, str, str, str, str, Dict[str, Any]]) ->
         )
     """
 
-    # COPY INTO Parquet with partitioning and compression in a single SQL call
+    # Final COPY statement that reads, filters, transforms, and exports in one pass
     copy_sql = f"""
         COPY (
             SELECT {select_columns}
             FROM ({read_csv_sql})
             {where_clause}
         )
-        TO '{root_output_dir}' 
+        TO '{output_path}' 
         (
-            FORMAT PARQUET,
-            PARTITION_BY (symbol, year),
-            FILENAME_PATTERN 'part_{{uuid}}',  -- random filenames allow parallel-safe writes
-            COMPRESSION '{options.get('compression', 'zstd').upper()}',
-            OVERWRITE_OR_IGNORE  -- avoid write failures on existing partitions
+            {format_options}
         );
     """
-
-    # In-memory connection ensures full isolation and zero local state
+    
+    # Execute COPY in an isolated in-memory DuckDB session
     con = duckdb.connect(database=':memory:')
     con.execute(copy_sql)
     con.close()
 
     return True
+
 
 
 # --- Wrapper for multiprocessing (required by run.py) ---
