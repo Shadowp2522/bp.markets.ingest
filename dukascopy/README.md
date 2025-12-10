@@ -698,6 +698,8 @@ After initial sync, you can up the value to 1. Rate limits were introduced due t
 
 >MSSIB Extension for DuckDB
 
+>C++ advanced concepts for trading (study)
+
 ---
 
 ## DuckDB (Advanced users)
