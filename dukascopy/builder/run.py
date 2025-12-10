@@ -341,7 +341,7 @@ def export_and_segregate_mt4(merged_file_path: Path):
             COPY (
                 SELECT
                     strftime(time, '%Y.%m.%d') AS Date,  -- Format date as YYYY.MM.DD
-                    strftime(time, '%H:%M') AS Time,     -- Format time as HH:MM
+                    strftime(time, '%H:%M:%S') AS Time,  -- Format time as HH:MM:SS
                     open,                                -- Open price
                     high,                                -- High price
                     low,                                 -- Low price
