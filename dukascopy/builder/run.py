@@ -320,7 +320,7 @@ def export_and_segregate_mt4(merged_file_path: Path):
                     close
                 FROM read_csv_auto('{merged_file_path}', union_by_name=true)
                 WHERE symbol = '{symbol}' AND timeframe = '{timeframe}'
-                ORDER BY time ASC
+                ORDER BY date asc, time ASC
             )
             TO '{output_path}'
             (
