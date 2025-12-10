@@ -511,6 +511,29 @@ print(df)
 You now have your own local forex high-performance analytics and data stack :)
 Don't forget to thank Dukascopy.
 
+**Note on MT4 support** You can now use the ```--mt4``` flag to split CSV output into MetaTrader-compatible files. This flag works only with ```./build-csv.sh``` and cannot be used with ```--partition```. It has been implemented as an additional step following the merge-csv process.
+
+```sh
+./build-csv.sh --select EUR-USD/8h,1h:skiplast,4h:skiplast --output temp/csv/test.csv \
+--after "2020-01-01 00:00:00" --mt4
+
+....
+
+Starting MT4 segregation process...
+  ✓ Exported: temp/csv/test_EUR-USD_4h.csv
+  ✓ Exported: temp/csv/test_EUR-USD_1h.csv
+  ✓ Exported: temp/csv/test_EUR-USD_8h.csv
+
+tail temp/csv/test_EUR-USD_1h.csv -n 5
+2025.12.10,06:00,1.16297,1.16354,1.16286,1.1635
+2025.12.10,07:00,1.16352,1.16493,1.16343,1.1648
+2025.12.10,08:00,1.16482,1.16576,1.16434,1.16525
+2025.12.10,09:00,1.16525,1.16528,1.16356,1.16365
+2025.12.10,10:00,1.16363,1.16394,1.16274,1.16343
+```
+
+>Should be directly loadable in MT.
+
 ---
 
 ## Performance Benchmarks
