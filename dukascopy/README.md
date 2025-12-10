@@ -18,7 +18,7 @@
 - [Output schema](#output-schema)
   - Details on generated files
 - [Quick Check](#quick-check)
-- [Parquet converter](#parquet-converter-v04-and-above)
+- [Parquet converter](#parquetcsv-export-v04-and-above)
   - Details on CSV->Parquet conversion
 - [Performance Benchmarks](#performance-benchmarks)
   - Cold Run (Full History)
@@ -427,9 +427,11 @@ The open candle will always be the last row in the CSV. If you prefer not to inc
 
 ---
 
-## Parquet converter (v0.4 and above)
+## Parquet/CSV export (v0.4 and above)
 
 A powerful new utility, build-parquet.sh, allows you to generate high-performance .parquet files or partitioned Hive-style Parquet datasets based on your selection criteria.
+
+>A new script, ```./build-csv.sh```, is available for generating CSV output. It accepts the same command-line arguments as ```./build-parquet.sh```.
 
 **Note:** for this utility to work you need to install DuckDB
 
