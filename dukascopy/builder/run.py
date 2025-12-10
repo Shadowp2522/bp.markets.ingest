@@ -147,59 +147,128 @@ def get_available_data_from_fs() -> List[Tuple[str, str, str]]:
             
     return sorted(set(available_data))
 
-
-def merge_parquet_files(input_dir: Path, output_file: str, compression: str, cleanup: bool) -> int:
+def merge_output_files(input_dir: Path, output_file: str, output_type: str, compression: str, cleanup: bool) -> int:
     """
-    Reads all temporary Parquet files from input_dir and merges them 
-    into a single final Parquet file using DuckDB.
+    Merge all temporary Parquet or CSV files from a directory into a single output file
+    using DuckDB.
+
+    The function identifies all files matching the requested output_type within
+    input_dir (recursively), loads them through DuckDB's readers, sorts the combined
+    dataset by the `time` column, and writes the result to output_file using the
+    specified compression settings. Parquet merges are performed with union-by-name
+    semantics to accommodate schema drift between shards.
 
     Args:
-        input_dir: Path to the directory containing temporary Parquet files.
-        output_file: The final destination filename (e.g., 'my_cool_file.parquet').
-        compression: The compression codec to use for the final file.
+        input_dir:
+            Directory containing temporary Parquet or CSV files to merge.
+        output_file:
+            Path to the final merged output file that will be written.
+        output_type:
+            Output format for the merged file. Must be either 'parquet' or 'csv'
+            (case-insensitive).
+        compression:
+            Compression codec to apply to the final file (e.g., 'zstd', 'gzip', 
+            'snappy', depending on DuckDB support).
+        cleanup:
+            If True, deletes all temporary files and removes input_dir after a 
+            successful or failed merge attempt.
 
     Returns:
-        int: The number of files successfully merged.
+        int:
+            The number of input files found and merged into the final output.
+
+    Raises:
+        ValueError:
+            If an unsupported output_type is provided.
+        Exception:
+            If DuckDB encounters an error during the merge or write process.
     """
-    input_files = list(input_dir.glob("**/*.parquet"))
+
+    # Normalize case early for consistency in comparisons
+    output_type = output_type.upper()
+    compression = compression.upper()
+    
+    # Determine which file extension and DuckDB reader to use
+    # Using glob patterns allows DuckDB to read many files in a single call
+    if output_type == 'PARQUET':
+        input_pattern = str(input_dir / "**" / "*.parquet")   # Recursive glob for all Parquet shards
+        read_function = "read_parquet"                        # DuckDB function name used in SQL context
+    elif output_type == 'CSV':
+        input_pattern = str(input_dir / "**" / "*.csv")
+        read_function = "read_csv_auto"                       # Auto-detect CSV schema
+    else:
+        raise ValueError(f"Unsupported output type for merging: {output_type}")
+
+    # Collect file paths to count them and confirm something exists to merge
+    input_files = list(input_dir.glob(f"**/*.{output_type.lower()}"))
+
     if not input_files:
-        print(f"Warning: No temporary Parquet files found in {input_dir}. Nothing to merge.")
+        # Early exit avoids creating an empty output file
+        print(f"Warning: No temporary {output_type} files found in {input_dir}. Nothing to merge.")
         return 0
 
-    # DuckDB's read_parquet function accepts a list of file paths.
-    input_pattern = str(input_dir / "**" / "*.parquet")
-    
+    # Build COPY TO settings and reader options depending on output type
+    if output_type == 'PARQUET':
+        # Parquet supports additional tuning such as row group size
+        format_options = f"""
+            FORMAT PARQUET,
+            COMPRESSION '{compression}',
+            ROW_GROUP_SIZE 1000000
+        """
+        # Ensures safe merging even when files differ slightly in schemas
+        read_options = ", union_by_name=true"
+    elif output_type == 'CSV':
+        # CSV requires explicit HEADER and DELIMITER declarations in DuckDB
+        format_options = f"""
+            FORMAT CSV,
+            HEADER true,
+            DELIMITER ',',
+            COMPRESSION '{compression}'
+        """
+        # No CSV-specific merge options needed
+        read_options = ""
+
+    # Use an in-memory DuckDB instance to avoid writing intermediary data
     con = duckdb.connect(database=':memory:')
     
     try:
-        # The query reads all matching Parquet files and executes a COPY TO statement.
+        # COPY query reads all files via glob, merges them, sorts on 'time', and writes once.
+        # DuckDB handles parallelization and columnar batching internally.
         merge_query = f"""
             COPY (
-                SELECT * FROM read_parquet('{input_pattern}', union_by_name=true)
-                ORDER BY time ASC
+                SELECT * FROM {read_function}('{input_pattern}'{read_options})
+                ORDER BY time ASC   -- final unified ordering
             )
             TO '{output_file}' 
             (
-                FORMAT PARQUET,
-                COMPRESSION '{compression.upper()}',
-                ROW_GROUP_SIZE 1000000
+                {format_options}
             );
         """
+
+        # Execute the merge; this performs the full consolidation in one SQL command
         con.execute(merge_query)
         
+        # Return the number of shards successfully merged
         return len(input_files)
 
     except Exception as e:
+        # Log the error before raising to preserve traceback
         print(f"Critical error during consolidation: {e}")
         raise
         
     finally:
         if cleanup:
-            for filename in input_files:
-                Path(filename).unlink()
-            shutil.rmtree(input_dir)
+            print(f"Cleaning up temporary directory: {input_dir}")
+            try:
+                # Remove the directory containing the temporary partitions
+                shutil.rmtree(input_dir)
+            except OSError as e:
+                # Cleanup failures shouldn’t mask merge failures
+                print(f"Error during cleanup of {input_dir}: {e}")
 
+        # Ensure DuckDB connection is closed even if an error occurred
         con.close()
+
 
 
 def parse_args():
@@ -233,6 +302,10 @@ def parse_args():
     output_group.add_argument('--output_dir', type=str, metavar='DIR_PATH',
                               help="Write a partitioned Parquet dataset.")
 
+    type_group = parser.add_mutually_exclusive_group(required=False)
+    type_group.add_argument('--csv', action='store_const', const='csv', dest='output_type', help="Write as CSV.")
+    type_group.add_argument('--parquet', action='store_const', const='parquet', dest='output_type', help="Write as Parquet (default).")
+
     parser.add_argument(
         '--compression', type=str, default='zstd',
         choices=['snappy', 'gzip', 'brotli', 'zstd', 'lz4', 'none'],
@@ -262,11 +335,28 @@ def parse_args():
     if dt_after and dt_until and dt_after >= dt_until:
         parser.error("--after must be strictly earlier than --until")
 
+    # Default to Parquet output
+    if args.output_type is None:
+        args.output_type = 'parquet'
+
+    # Validate Compression against Output Type
+    compression_choices = {
+        'parquet': ['snappy', 'gzip', 'brotli', 'zstd', 'lz4', 'none', 'uncompressed'],
+        'csv': ['none', 'uncompressed', 'gzip', 'zstd'] # Common CSV compressions
+    }
+    
+    if args.compression not in compression_choices.get(args.output_type, ['none']):
+        parser.error(
+            f"Compression '{args.compression}' is not suitable for output type '{args.output_type}'. "
+            f"Valid options are: {', '.join(compression_choices.get(args.output_type, ['none']))}"
+        )
+
     # These flags must be paired correctly depending on output mode
     if args.partition and not args.output_dir:
         parser.error("--partition requires --output_dir")
     if not args.partition and not args.output:
-        parser.error("Without --partition, --output must be provided")
+        if args.output_type == 'parquet':
+            parser.error("Without --partition, --output must be provided")
 
     # Load (symbol, timeframe, file_path) entries from the filesystem
     all_available_data = get_available_data_from_fs()
@@ -375,6 +465,7 @@ def parse_args():
         'select_data': sorted(final_selections), 
         'partition': args.partition,
         'output_dir': args.output_dir,
+        'output_type': args.output_type,
         'dry_run': args.dry_run,
         'force': args.force,
         'keep_temp': args.keep_temp,
@@ -444,11 +535,12 @@ def main():
         start_time = time.time()
 
         options = parse_args()
-        print(f"Running Dukascopy PARQUET exporter ({NUM_PROCESSES} processes)")
+
+        print(f"Running Dukascopy PARQUET/CSV exporter ({NUM_PROCESSES} processes)")
 
         # Not partition handling? we need to set a temp output directory
         if not options['partition']:
-            options['output_dir'] = f"data/temp/parquet/{uuid.uuid4()}"
+            options['output_dir'] = f"data/temp/{options['output_type']}/{uuid.uuid4()}"
 
         # Build list of extraction tasks for workers
         extract_tasks = [
@@ -481,19 +573,17 @@ def main():
                     print(f"\nABORT! Critical error in {name}.\n{type(e).__name__}: {e}")
                     break
         
-        # TODO: implement merging / partition assembly
+        # Merge
         if not options['partition']:
             print(f"Merging {options['output_dir']} to {options['output']}...")
-            merge_parquet_files(Path(options['output_dir']), options['output'], options['compression'], not options['keep_temp'])
-
-            pass
+            merge_output_files(Path(options['output_dir']), options['output'], options['output_type'], options['compression'], not options['keep_temp'])
 
         elapsed = time.time() - start_time
         print("\nExport complete!")
         print(f"Total runtime: {elapsed:.2f} seconds ({elapsed/60:.2f} minutes)")
 
-    except Exception:
-        print("Error")
+    except Exception as e:
+        print(f"Error {e}")
     except KeyboardInterrupt:
         print("")
         return False

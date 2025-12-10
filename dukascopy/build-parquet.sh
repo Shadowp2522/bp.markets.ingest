@@ -1,3 +1,3 @@
 #!/bin/bash
 
-python3 builder/run.py "$@"
+python3 builder/run.py --parquet "$@"
