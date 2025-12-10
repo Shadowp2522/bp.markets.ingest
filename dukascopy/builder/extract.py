@@ -135,7 +135,7 @@ def extract_symbol(task: Tuple[str, str, str, str, str, str, Dict[str, Any]]) ->
             format_options = f"""
                 FORMAT CSV,
                 PARTITION_BY (symbol, year),
-                FILENAME_PATTERN 'part_{{uuid}}.csv',
+                FILENAME_PATTERN 'part_{{uuid}}',
                 COMPRESSION '{compression}',
                 HEADER true,
                 DELIMITER ',',
