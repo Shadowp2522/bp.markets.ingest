@@ -662,11 +662,16 @@ def main():
         # Merge
         if not options['partition']:
             print(f"Merging {options['output_dir']} to {options['output']}...")
+            # Personally, i dont like cli programs
+            if not Path(options['output']).parent.exists():
+                Path(options['output']).parent.mkdir(parents=True, exist_ok=True)
+            # Now, go merge!
             merge_output_files(Path(options['output_dir']), options['output'], options['output_type'], options['compression'], not options['keep_temp'])
             if options['mt4']:
+                # And,.. split again for metatrader (not optimal, bit hacky, but works)
                 export_and_segregate_mt4(options['output'])
                 if not options['keep_temp']:
-                    Path(options['output']).unlink()
+                    Path(options['output']).unlink(missing_ok=True)
 
         elapsed = time.time() - start_time
         print("\nExport complete!")
