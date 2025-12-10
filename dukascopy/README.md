@@ -717,6 +717,8 @@ After initial sync, you can up the value to 1. Rate limits were introduced due t
 
 ## Notes and Future Work
 
+>Higher priority: shift candles in transform step to --nyclose (GMT+2/+3). Soon. Configurable.
+
 >HTTP API for OHLC retrieval
 
 >Replay functionality?
